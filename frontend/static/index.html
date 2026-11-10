@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RESUME TAILOR</title>
+  <!-- Kinetic Design System Stylesheet (Standalone, decoupled from logic) -->
+  <link rel="stylesheet" href="/static/css/kinetic.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="kinetic-header">
+    <nav class="kinetic-nav">
+      <h1 class="brand-title">RESUME TAILOR</h1>
+    </nav>
+  </header>
+
+  <!-- Kinetic Moving Marquee Band -->
+  <aside class="marquee-band" aria-label="System Principles">
+    <div class="marquee-content">
+      TARGETED MODIFICATION <span>//</span> INVARIABLE BASELINE <span>//</span> ATS OPTIMIZED PDF <span>//</span> PRESERVED EMPLOYMENT HISTORY <span>//</span> PERSONALIZED EXPERIENCE <span>//</span> COVER LETTER <span>//</span> LINKEDIN &amp; EMAIL OUTREACH <span>//</span> FACTUAL ACCURACY GUARANTEED <span>//</span> GITHUB &amp; LINKEDIN PORTFOLIO INTEGRATED <span>//</span>
+    </div>
+  </aside>
+
+  <!-- Main Workspace Grid -->
+  <main class="workspace-grid">
+
+    <!-- Column 1: Job Description Input & Controls -->
+    <section class="kinetic-panel">
+      
+      <div class="panel-header">
+        <h2 class="panel-title">TARGET JOB</h2>
+        <span id="jdWordCount" class="jd-word-count">[ 0 WORDS // 0 CHARS ]</span>
+      </div>
+
+      <div class="panel-body">
+        
+        <div class="field-group">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.25rem;">
+            <label class="field-label" for="jobDescriptionInput" style="margin-bottom: 0;">PASTE COMPLETE JOB DESCRIPTION &darr;</label>
+            <div style="font-family: var(--dp-typography-mono); font-size: 0.7rem; color: var(--dp-color-ink-muted); display: flex; gap: 0.35rem; align-items: center;">
+              <span>SAMPLES:</span>
+              <button id="loadSampleBackendBtn" class="sample-link" type="button">[ FACILITIES / OPS ]</button>
+              <button id="loadSampleAIBtn" class="sample-link" type="button">[ CLOUD / SYSTEMS ]</button>
+            </div>
+          </div>
+          <textarea
+            id="jobDescriptionInput"
+            class="kinetic-textarea"
+            style="margin-top: 0.35rem;"
+            placeholder="Paste complete target job posting here (roles, responsibilities, required qualifications, core technologies)..."
+          ></textarea>
+        </div>
+
+        <!-- Main Trigger Actions -->
+        <div class="input-actions" style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; width: 100%;">
+            <button id="clearJdBtn" class="btn-secondary btn-clear" style="flex: 0 0 auto;">CLEAR</button>
+            <button id="generateResumeBtn" class="btn-kinetic" style="flex: 1;">
+              <span>TAILOR RESUME</span>
+              <span class="btn-arrow">&rarr;</span>
+            </button>
+          </div>
+          <button id="generateCoverLetterBtn" class="btn-secondary" style="width: 100%; border: 2px solid var(--dp-color-rule); padding: 0.65rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; text-transform: uppercase; font-weight: 700; font-family: var(--dp-typography-face); background: var(--dp-color-surface);">
+            <span>TAILOR AS A COVER LETTER</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+          <button id="generateOutreachBtn" class="btn-secondary" style="width: 100%; border: 2px solid var(--dp-color-rule); padding: 0.65rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; text-transform: uppercase; font-weight: 700; font-family: var(--dp-typography-face); background: var(--dp-color-surface);">
+            <span>TAILOR OUTREACH (LINKEDIN &amp; EMAIL)</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+
+        <!-- Tailoring Insights Card (Appears after Generation) -->
+        <div id="analysisCard" class="insights-box hidden">
+          <h3>// TAILORING ALIGNMENT INSIGHTS</h3>
+          <div class="insight-item">
+            <div class="insight-key">INFERRED TARGET ROLE</div>
+            <div id="targetRoleBadge" class="insight-val">-</div>
+          </div>
+          <div class="insight-item">
+            <div class="insight-key">CORE TECH MATCH</div>
+            <div id="keyTechBadges"></div>
+          </div>
+          <div class="insight-item">
+            <div class="insight-key">PROJECT SLOT 1 (EXISTING)</div>
+            <div id="slot1Desc" class="insight-val">-</div>
+          </div>
+          <div class="insight-item">
+            <div class="insight-key">PROJECT SLOT 2</div>
+            <div id="slot2Desc" class="insight-val">-</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Column 2: Dual Previews, Diff, & Raw Editor -->
+    <section class="kinetic-panel">
+
+      <!-- Tab Navigation -->
+      <div class="tabs-bar" role="tablist">
+        <button id="tabTailored" class="tab-item active" role="tab">
+          <span class="tab-index">01</span>
+          <span>TAILORED RESUME</span>
+        </button>
+        <button id="tabCoverLetter" class="tab-item" role="tab">
+          <span class="tab-index">02</span>
+          <span>COVER LETTER</span>
+        </button>
+        <button id="tabOutreach" class="tab-item" role="tab">
+          <span class="tab-index">03</span>
+          <span>OUTREACH</span>
+        </button>
+        <button id="tabOriginal" class="tab-item" role="tab">
+          <span class="tab-index">04</span>
+          <span>ORIGINAL MASTER</span>
+        </button>
+        <button id="tabDiff" class="tab-item" role="tab">
+          <span class="tab-index">05</span>
+          <span>DIFF COMPARISON</span>
+        </button>
+        <button id="tabEditor" class="tab-item" role="tab">
+          <span class="tab-index">06</span>
+          <span>MARKDOWN EDITOR</span>
+        </button>
+      </div>
+
+      <!-- Action Toolbar (Downloads) -->
+      <div class="toolbar-actions">
+        <button id="downloadMarkdownBtn" class="btn-download">
+          <span>EXPORT .MD</span>
+          <span>&darr;</span>
+        </button>
+        <button id="downloadPdfBtn" class="btn-download accent">
+          <span>DOWNLOAD ATS PDF</span>
+          <span>&darr;</span>
+        </button>
+      </div>
+
+      <!-- Kinetic Loading State -->
+      <div id="processingIndicator" class="loading-box hidden">
+        <div class="spinner-kinetic"></div>
+        <div class="loading-title">
+          TAILORING RESUME WITH INVARIANCE GUARDRAILS...
+        </div>
+        <div id="processingStepText" class="loading-step">
+          ANALYZING JOB SPECIFICATION &amp; MATCHING PROJECT CATALOG...
+        </div>
+      </div>
+
+      <!-- Tab 1: Tailored Resume Preview (Rendered on high-contrast paper) -->
+      <div id="panelTailored" class="preview-container">
+        <div id="tailoredResumeRender">
+          <div class="placeholder-notice">
+            <div class="placeholder-icon">&uarr;</div>
+            <div>PASTE JOB SPECIFICATION ON THE LEFT &amp; TRIGGER &ldquo;TAILOR RESUME&rdquo;</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Tailored Cover Letter Preview -->
+      <div id="panelCoverLetter" class="preview-container hidden">
+        <div id="coverLetterRender">
+          <div class="placeholder-notice">
+            <div class="placeholder-icon">&uarr;</div>
+            <div>PASTE TARGET JOB ON THE LEFT &amp; TRIGGER &ldquo;TAILOR AS A COVER LETTER&rdquo;</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Tailored Outreach Messages (LinkedIn & Email) -->
+      <div id="panelOutreach" class="preview-container hidden">
+        <div class="outreach-wrapper">
+
+          <!-- Version 1: LinkedIn Direct Message -->
+          <div class="outreach-card">
+            <div class="outreach-card-header">
+              <div class="outreach-card-title">
+                <span class="version-tag">[ VERSION 01 ]</span>
+                <span>LINKEDIN DIRECT / INMAIL MESSAGE</span>
+              </div>
+              <button id="copyLinkedInBtn" class="btn-copy-outreach" type="button" title="Copy to clipboard">
+                <span class="copy-text">COPY MESSAGE</span>
+              </button>
+            </div>
+            <div class="outreach-card-meta">
+              <span>TARGETED FOR: LINKEDIN CONNECTION / INMAIL / RECRUITER DM</span>
+              <span id="linkedinStats" class="outreach-stats">[ 0 WORDS // 0 CHARS ]</span>
+            </div>
+            <div class="outreach-content-box">
+              <textarea id="linkedinMessageText" class="outreach-textarea" readonly placeholder="Click &ldquo;TAILOR OUTREACH&rdquo; on the left to generate customized LinkedIn message..."></textarea>
+            </div>
+          </div>
+
+          <!-- Version 2: Direct Cold Email -->
+          <div class="outreach-card">
+            <div class="outreach-card-header">
+              <div class="outreach-card-title">
+                <span class="version-tag">[ VERSION 02 ]</span>
+                <span>DIRECT EMAIL OUTREACH</span>
+              </div>
+              <div class="email-copy-group">
+                <button id="copyEmailSubjectBtn" class="btn-copy-outreach" type="button" title="Copy subject line">
+                  <span class="copy-text">COPY SUBJECT</span>
+                </button>
+                <button id="copyEmailBtn" class="btn-copy-outreach accent" type="button" title="Copy full email">
+                  <span class="copy-text">COPY FULL EMAIL</span>
+                </button>
+              </div>
+            </div>
+            <div class="outreach-card-meta">
+              <span>TARGETED FOR: DIRECT HIRING MANAGER / RECRUITER INBOX</span>
+              <span id="emailStats" class="outreach-stats">[ 0 WORDS // 0 CHARS ]</span>
+            </div>
+            <div class="email-subject-row">
+              <span class="email-subject-label">SUBJECT:</span>
+              <input id="emailSubjectText" class="email-subject-input" readonly placeholder="High-open-rate subject line will appear here..." />
+            </div>
+            <div class="outreach-content-box">
+              <textarea id="emailBodyText" class="outreach-textarea" readonly placeholder="Click &ldquo;TAILOR OUTREACH&rdquo; on the left to generate customized 3-paragraph direct email..."></textarea>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tab 4: Original Master Resume Preview -->
+      <div id="panelOriginal" class="preview-container hidden">
+        <div class="baseline-notice">
+          <strong class="baseline-tag">[ IMMUTABLE REPOSITORY MASTER ]</strong>
+          <span>Read-only baseline stored in repository. Never overwritten.</span>
+        </div>
+        <div id="originalResumeRender"></div>
+      </div>
+
+      <!-- Tab 5: Diff Viewer -->
+      <div id="panelDiff" class="preview-container hidden">
+        <div id="diffContainer">
+          <p class="diff-placeholder">
+            TRIGGER TAILORING TO INSPECT TARGETED SECTION MODIFICATIONS.
+          </p>
+        </div>
+      </div>
+
+      <!-- Tab 6: Interactive Markdown Editor -->
+      <div id="panelEditor" class="preview-container hidden editor-container">
+        <div class="editor-header">
+          <span>DIRECT EDITING MODE &bull; UPDATES PREVIEW AND PDF IN REAL TIME</span>
+          <button id="resetEditorBtn" class="sample-link">[ RESET TO GENERATED ]</button>
+        </div>
+        <textarea
+          id="markdownEditorInput"
+          class="markdown-editor-area"
+        ></textarea>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Kinetic Footer -->
+  <footer class="kinetic-footer">
+    <div>RESUME TAILOR &bull; KINETIC DESIGN SYSTEM &bull; DETERMINISTIC ATS COMPILER</div>
+    <div>ZERO FABRICATION &bull; 100% FACTUAL INVARIANCE</div>
+  </footer>
+
+  <!-- Decoupled JavaScript Logic -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

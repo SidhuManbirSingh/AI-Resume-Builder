@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  resume-tailor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resume_tailor_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - MASTER_RESUME_PATH=/app/data/master/master_resume.md
+      - PROJECTS_DIR=/app/data/projects
+      - OUTPUT_DIR=/app/data/output
+      - STATIC_DIR=/app/frontend/static
+    volumes:
+      # Mandatory Invariance Protection: Master Resume and Projects mounted READ-ONLY (:ro)
+      - ./data/master:/app/data/master:ro
+      - ./data/projects:/app/data/projects:ro
+      # Output directory mounted read-write for exported resumes & PDFs
+      - ./data/output:/app/data/output:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

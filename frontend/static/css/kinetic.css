@@ -1,0 +1,1066 @@
+/* ==========================================================================
+   KINETIC DESIGN SYSTEM
+   Authoritative Design Tokens & Mobile-First Component Specifications
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* Colors */
+  --dp-color-ground: #101010;
+  --dp-color-surface: #171717;
+  --dp-color-surface-elevated: #202020;
+  --dp-color-ink: #ffffff;
+  --dp-color-ink-muted: #a3a3a3;
+  --dp-color-accent: #ff6b00;
+  --dp-color-accent-hover: #e05e00;
+  --dp-color-decorative: #343434;
+  --dp-color-rule: #5c5c5c;
+  --dp-color-rule-dark: #2c2c2c;
+
+  /* Typography */
+  --dp-typography-face: "Host Grotesk", "Kinetic Host Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dp-typography-mono: "JetBrains Mono", monospace;
+  --dp-typography-body: 1.125rem;
+  --dp-typography-reading: 1rem;
+  --dp-typography-small: 0.875rem;
+  --dp-typography-label: 0.75rem;
+  --dp-typography-display-weight: 800;
+  --dp-typography-heading-weight: 700;
+  --dp-typography-label-weight: 600;
+  --dp-typography-solid-leading: 1.1;
+  --dp-typography-display-tracking: -0.04em;
+
+  /* Spacing & Borders */
+  --dp-spacing-gutter: max(0.875rem, 2.2cqw);
+  --dp-spacing-column-gap: 1.5rem;
+  --dp-spacing-reading-inset: 0.875rem 1.125rem;
+  --dp-radius-control: 0px;
+  --dp-border-rule: 2px;
+  --dp-motion-marquee-easing: linear;
+}
+
+/* ==========================================================================
+   Base & Global Styles (Mobile-First)
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-radius: var(--dp-radius-control) !important;
+}
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--dp-color-ground);
+  color: var(--dp-color-ink);
+  font-family: var(--dp-typography-face);
+  font-size: var(--dp-typography-reading);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   Header & Bold Display Title
+   ========================================================================== */
+.kinetic-header {
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-ground);
+  padding: 1rem 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+}
+
+.kinetic-nav {
+  width: 100%;
+  max-width: 90rem;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* Centered, bold strong font, larger and fluid across all screen widths */
+.brand-title {
+  font-size: clamp(2.25rem, 6.5vw, 3.75rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: var(--dp-typography-solid-leading);
+  color: var(--dp-color-ink);
+  text-align: center;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   Marquee Principles Ticker
+   ========================================================================== */
+.marquee-band {
+  width: 100%;
+  overflow: hidden;
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-surface);
+  padding: 0.625rem 0;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee 28s linear infinite;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.8125rem;
+  font-weight: var(--dp-typography-label-weight);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dp-color-ink-muted);
+}
+
+.marquee-content span {
+  color: var(--dp-color-accent);
+  margin: 0 0.75rem;
+}
+
+.marquee-band:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-content {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Workspace Grid (Mobile-First: Single Column Stack)
+   ========================================================================== */
+.workspace-grid {
+  width: 100%;
+  max-width: 90rem;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex: 1;
+}
+
+/* ==========================================================================
+   Kinetic Hard-Ruled Panels
+   ========================================================================== */
+.kinetic-panel {
+  border: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-surface);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0; /* Prevents overflow in flex/grid child */
+}
+
+.panel-header {
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  padding: 0.875rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background-color: var(--dp-color-surface-elevated);
+}
+
+.panel-title {
+  font-size: var(--dp-typography-label);
+  font-weight: var(--dp-typography-label-weight);
+  font-family: var(--dp-typography-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dp-color-ink);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.jd-word-count {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.7rem;
+  color: var(--dp-color-accent);
+  letter-spacing: 0.05em;
+}
+
+.panel-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 1rem;
+  width: 100%;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+}
+
+.field-label {
+  display: block;
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  text-transform: uppercase;
+  color: var(--dp-color-ink-muted);
+  margin-bottom: 0.375rem;
+  letter-spacing: 0.05em;
+}
+
+/* ==========================================================================
+   Inputs & Textareas
+   ========================================================================== */
+.kinetic-textarea {
+  width: 100%;
+  min-height: 16rem;
+  background-color: var(--dp-color-ground);
+  color: var(--dp-color-ink);
+  border: 1px solid var(--dp-color-rule);
+  padding: 0.875rem;
+  font-family: var(--dp-typography-face);
+  font-size: var(--dp-typography-small);
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.kinetic-textarea:focus {
+  outline: 2px solid var(--dp-color-accent);
+  border-color: var(--dp-color-accent);
+}
+
+/* ==========================================================================
+   Interactive Actions & Buttons (Touch-Friendly Targets)
+   ========================================================================== */
+.input-actions {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 0.625rem;
+  width: 100%;
+}
+
+.btn-kinetic {
+  background-color: var(--dp-color-accent);
+  color: var(--dp-color-ground);
+  border: 2px solid var(--dp-color-accent);
+  font-family: var(--dp-typography-face);
+  font-size: var(--dp-typography-reading);
+  font-weight: var(--dp-typography-display-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1.25rem;
+  min-height: 3rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: background-color 0.1s ease, color 0.1s ease, transform 0.05s ease;
+  flex: 1 1 auto;
+}
+
+.btn-kinetic:hover {
+  background-color: var(--dp-color-ink);
+  border-color: var(--dp-color-ink);
+  color: var(--dp-color-ground);
+}
+
+.btn-kinetic:active {
+  transform: scale(0.98);
+}
+
+.btn-kinetic:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-arrow {
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.btn-kinetic:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--dp-color-ink);
+  border: 1px solid var(--dp-color-rule);
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  padding: 0.625rem 0.875rem;
+  min-height: 3rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary:hover {
+  background-color: var(--dp-color-surface-elevated);
+  border-color: var(--dp-color-ink);
+}
+
+.btn-clear {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+}
+
+/* ==========================================================================
+   Tab Navigation System (Horizontally Scrollable, Touch-Optimized)
+   ========================================================================== */
+.tabs-bar {
+  display: flex;
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-ground);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.tab-item {
+  background-color: transparent;
+  color: var(--dp-color-ink-muted);
+  border: none;
+  border-right: 1px solid var(--dp-color-rule);
+  padding: 0.75rem 1rem;
+  min-height: 2.75rem;
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  font-weight: var(--dp-typography-label-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  transition: all 0.1s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.tab-item:hover {
+  background-color: var(--dp-color-surface);
+  color: var(--dp-color-ink);
+}
+
+.tab-item.active {
+  background-color: var(--dp-color-surface-elevated);
+  color: var(--dp-color-accent);
+  border-bottom: 2px solid var(--dp-color-accent);
+}
+
+.tab-index {
+  color: var(--dp-color-decorative);
+  font-weight: 700;
+}
+
+.tab-item.active .tab-index {
+  color: var(--dp-color-accent);
+}
+
+/* ==========================================================================
+   Action Toolbar (Downloads)
+   ========================================================================== */
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-ground);
+  width: 100%;
+}
+
+.btn-download {
+  background-color: var(--dp-color-surface);
+  color: var(--dp-color-ink);
+  border: 1px solid var(--dp-color-rule);
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  padding: 0.625rem 0.875rem;
+  min-height: 2.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1 1 calc(50% - 0.25rem);
+  text-align: center;
+}
+
+.btn-download:hover {
+  background-color: var(--dp-color-ink);
+  color: var(--dp-color-ground);
+  border-color: var(--dp-color-ink);
+}
+
+.btn-download.accent {
+  background-color: var(--dp-color-accent);
+  color: var(--dp-color-ground);
+  border-color: var(--dp-color-accent);
+  font-weight: 700;
+}
+
+.btn-download.accent:hover {
+  background-color: var(--dp-color-ink);
+  color: var(--dp-color-ground);
+}
+
+/* ==========================================================================
+   Preview Panels & Reading Grounds
+   ========================================================================== */
+.preview-container {
+  padding: 0.875rem;
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--dp-color-ground);
+  width: 100%;
+}
+
+.placeholder-notice {
+  text-align: center;
+  padding: clamp(3rem, 10vw, 6.25rem) 1rem;
+  color: var(--dp-color-ink-muted);
+  font-family: var(--dp-typography-mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.placeholder-icon {
+  font-size: 2rem;
+  color: var(--dp-color-rule);
+  margin-bottom: 0.75rem;
+}
+
+.baseline-notice {
+  background-color: #271e0c;
+  border: 1px solid var(--dp-color-accent);
+  padding: 0.625rem 1rem;
+  margin-bottom: 1.25rem;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.75rem;
+  color: #fed7aa;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.baseline-tag {
+  color: var(--dp-color-accent);
+}
+
+/* ==========================================================================
+   Opaque High-Contrast Resume Canvas
+   ========================================================================== */
+.resume-paper {
+  background-color: #ffffff;
+  color: #111827;
+  padding: clamp(1.5rem, 3.5vw, 2.5rem);
+  border: 2px solid var(--dp-color-rule);
+  box-shadow: 4px 4px 0px var(--dp-color-decorative);
+  font-family: var(--dp-typography-face);
+  line-height: 1.5;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 52rem;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.resume-paper .r-name {
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  color: #000000;
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+}
+
+.resume-paper .r-contact {
+  font-size: 0.8125rem;
+  color: #4b5563;
+  margin-bottom: 1.125rem;
+  border-bottom: 2px solid #000000;
+  padding-bottom: 0.5rem;
+  overflow-wrap: break-word;
+}
+
+.resume-paper .r-section-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0f172a;
+  border-bottom: 1.5px solid #cbd5e1;
+  padding-bottom: 0.25rem;
+  margin-top: 1.35rem;
+  margin-bottom: 0.65rem;
+}
+
+.resume-paper .r-job-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-weight: 700;
+  font-size: 0.84375rem;
+  color: #0f172a;
+}
+
+.resume-paper .r-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.resume-paper ul {
+  margin: 0.35rem 0 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.resume-paper li {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #1e293b;
+  margin-bottom: 0.35rem;
+}
+
+.resume-paper .proposal-tag {
+  background-color: #ffedd5;
+  color: #9a3412;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  padding: 0.1rem 0.375rem;
+  border: 1px solid #fdba74;
+  margin-left: 0.375rem;
+  display: inline-block;
+}
+
+/* ==========================================================================
+   Diff Viewer (Mobile-First: 1 Column Stack)
+   ========================================================================== */
+.diff-placeholder {
+  text-align: center;
+  color: var(--dp-color-ink-muted);
+  padding: clamp(2rem, 8vw, 3.75rem) 1rem;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.diff-row {
+  border: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-surface);
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.diff-title-bar {
+  background-color: var(--dp-color-surface-elevated);
+  padding: 0.625rem 1rem;
+  border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.diff-badge {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-family: var(--dp-typography-mono);
+}
+
+.diff-badge.modified {
+  background-color: #1e3a8a;
+  color: #bfdbfe;
+}
+
+.diff-badge.selected {
+  background-color: #065f46;
+  color: #a7f3d0;
+}
+
+.diff-badge.proposed {
+  background-color: var(--dp-color-accent);
+  color: var(--dp-color-ground);
+  font-weight: 700;
+}
+
+.diff-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+
+.diff-pane-orig {
+  background-color: #1c1414;
+  border-bottom: 1px solid var(--dp-color-rule);
+  padding: 0.875rem 1rem;
+  font-size: var(--dp-typography-small);
+  color: #fca5a5;
+  white-space: pre-wrap;
+  font-family: var(--dp-typography-face);
+  overflow-x: auto;
+}
+
+.diff-pane-mod {
+  background-color: #121c15;
+  padding: 0.875rem 1rem;
+  font-size: var(--dp-typography-small);
+  color: #86efac;
+  white-space: pre-wrap;
+  font-family: var(--dp-typography-face);
+  overflow-x: auto;
+}
+
+.pane-label {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.375rem;
+  letter-spacing: 0.05em;
+}
+
+/* ==========================================================================
+   Interactive Markdown Editor
+   ========================================================================== */
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.editor-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.7rem;
+  color: var(--dp-color-ink-muted);
+}
+
+.sample-link {
+  color: var(--dp-color-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+.sample-link:hover {
+  color: var(--dp-color-ink);
+}
+
+.markdown-editor-area {
+  width: 100%;
+  flex: 1;
+  min-height: 18rem;
+  background-color: #000000;
+  color: #4ade80;
+  border: 2px solid var(--dp-color-rule);
+  padding: 1rem;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Tailoring Insights Feature Panel
+   ========================================================================== */
+.insights-box {
+  border: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-surface);
+  padding: 1rem 1.25rem;
+  margin-top: 1.25rem;
+  width: 100%;
+}
+
+.insights-box h3 {
+  font-size: var(--dp-typography-label);
+  font-family: var(--dp-typography-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--dp-color-accent);
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.insight-item {
+  border-bottom: 1px solid var(--dp-color-rule-dark);
+  padding: 0.625rem 0;
+}
+
+.insight-item:last-child {
+  border-bottom: none;
+}
+
+.insight-key {
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  color: var(--dp-color-ink-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.insight-val {
+  font-size: var(--dp-typography-small);
+  color: var(--dp-color-ink);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   Loading Sequence
+   ========================================================================== */
+.loading-box {
+  padding: 3.5rem 1.25rem;
+  text-align: center;
+  border: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-surface);
+}
+
+.spinner-kinetic {
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid var(--dp-color-rule);
+  border-top-color: var(--dp-color-accent);
+  animation: spin 0.75s linear infinite;
+  margin: 0 auto 1.25rem auto;
+}
+
+.loading-title {
+  font-family: var(--dp-typography-face);
+  font-weight: 800;
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  padding: 0 0.5rem;
+}
+
+.loading-step {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.75rem;
+  color: var(--dp-color-accent);
+  margin-top: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Outreach Messages Component (LinkedIn & Cold Email)
+   ========================================================================== */
+.outreach-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.outreach-card {
+  background-color: var(--dp-color-surface);
+  border: var(--dp-border-rule) solid var(--dp-color-rule);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.outreach-card-header {
+  background-color: var(--dp-color-surface-elevated);
+  border-bottom: 1px solid var(--dp-color-rule);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.outreach-card-title {
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--dp-color-ink);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.version-tag {
+  color: var(--dp-color-accent);
+}
+
+.email-copy-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-copy-outreach {
+  background-color: var(--dp-color-surface);
+  color: var(--dp-color-ink);
+  border: 1px solid var(--dp-color-rule);
+  font-family: var(--dp-typography-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-transform: uppercase;
+  transition: all 0.1s ease;
+}
+
+.btn-copy-outreach:hover {
+  background-color: var(--dp-color-ink);
+  color: var(--dp-color-ground);
+  border-color: var(--dp-color-ink);
+}
+
+.btn-copy-outreach.accent {
+  background-color: var(--dp-color-accent);
+  color: var(--dp-color-ground);
+  border-color: var(--dp-color-accent);
+}
+
+.btn-copy-outreach.accent:hover {
+  background-color: var(--dp-color-ink);
+  color: var(--dp-color-ground);
+}
+
+.btn-copy-outreach.copied {
+  background-color: #22c55e !important;
+  color: #000000 !important;
+  border-color: #22c55e !important;
+}
+
+.outreach-card-meta {
+  background-color: var(--dp-color-ground);
+  border-bottom: 1px solid var(--dp-color-rule);
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: var(--dp-typography-mono);
+  font-size: 0.7rem;
+  color: var(--dp-color-ink-muted);
+}
+
+.outreach-stats {
+  color: var(--dp-color-accent);
+}
+
+.email-subject-row {
+  display: flex;
+  align-items: center;
+  background-color: var(--dp-color-ground);
+  border-bottom: 1px solid var(--dp-color-rule);
+  padding: 0.5rem 1rem;
+  gap: 0.75rem;
+}
+
+.email-subject-label {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--dp-color-accent);
+  flex: 0 0 auto;
+}
+
+.email-subject-input {
+  flex: 1;
+  background-color: transparent;
+  border: none;
+  color: var(--dp-color-ink);
+  font-family: var(--dp-typography-face);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  outline: none;
+  width: 100%;
+}
+
+.outreach-content-box {
+  padding: 1rem;
+  background-color: var(--dp-color-surface);
+}
+
+.outreach-textarea {
+  width: 100%;
+  min-height: 12rem;
+  background-color: var(--dp-color-ground);
+  color: var(--dp-color-ink);
+  border: 1px solid var(--dp-color-rule);
+  padding: 0.875rem;
+  font-family: var(--dp-typography-face);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.outreach-textarea:focus {
+  outline: 2px solid var(--dp-color-accent);
+  border-color: var(--dp-color-accent);
+}
+
+/* Hidden utility */
+.hidden {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Footer (Mobile-First: Stacked & Centered)
+   ========================================================================== */
+.kinetic-footer {
+  border-top: var(--dp-border-rule) solid var(--dp-color-rule);
+  background-color: var(--dp-color-ground);
+  padding: 1rem 1.25rem;
+  margin-top: auto;
+  font-family: var(--dp-typography-mono);
+  font-size: var(--dp-typography-label);
+  color: var(--dp-color-ink-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Natural Breakpoint 1: Mid Viewport Expansion (~42em / ~672px)
+   Point at which single columns begin to have ample horizontal breathing room
+   ========================================================================== */
+@media (min-width: 42em) {
+  .toolbar-actions {
+    justify-content: flex-end;
+  }
+
+  .btn-download {
+    flex: 0 0 auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .diff-split {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .diff-pane-orig {
+    border-bottom: none;
+    border-right: 1px solid var(--dp-color-rule);
+  }
+
+  .resume-paper {
+    padding: 2rem 2.25rem;
+  }
+
+  .kinetic-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+    padding: 1rem 1.5rem;
+  }
+}
+
+/* ==========================================================================
+   Natural Breakpoint 2: Large Workspace Expansion (~62em / ~992px)
+   Point at which dual-column layout fits comfortably side-by-side
+   ========================================================================== */
+@media (min-width: 62em) {
+  .workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(22rem, 28rem) 1fr;
+    gap: var(--dp-spacing-column-gap);
+    padding: 1.5rem 2rem;
+  }
+
+  .preview-container {
+    padding: 1.75rem;
+    max-height: 52rem;
+  }
+
+  .kinetic-textarea {
+    min-height: 25rem;
+  }
+
+  .markdown-editor-area {
+    min-height: 32rem;
+  }
+
+  .resume-paper {
+    padding: 2.5rem 2.75rem;
+    box-shadow: 6px 6px 0px var(--dp-color-decorative);
+  }
+}
