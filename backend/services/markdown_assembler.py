@@ -49,7 +49,10 @@ class MarkdownAssembler:
         lines.append("## Projects")
         
         # Slot 1
-        lines.append(f"### {customized.slot1_title}")
+        slot1_title = customized.slot1_title
+        if customized.slot1_github_url and "[github]" not in slot1_title.lower():
+            slot1_title = f"{slot1_title} | [GitHub]({customized.slot1_github_url})"
+        lines.append(f"### {slot1_title}")
         for bullet in customized.slot1_bullets:
             b_str = bullet.strip()
             if b_str and b_str != ".":
@@ -67,6 +70,8 @@ class MarkdownAssembler:
             ).strip()
             if "(under development)" not in slot2_title.lower():
                 slot2_title = f"{slot2_title} (Under Development)"
+        elif customized.slot2_github_url and "[github]" not in slot2_title.lower():
+            slot2_title = f"{slot2_title} | [GitHub]({customized.slot2_github_url})"
 
         lines.append(f"### {slot2_title}")
         for bullet in customized.slot2_bullets:
@@ -95,13 +100,18 @@ class MarkdownAssembler:
         return "\n".join(lines).strip()
 
     @staticmethod
-    def generate_diffs(master_parsed: Dict[str, Any], customized: Stage2CustomizationResult) -> List[DiffItem]:
+    def generate_diffs(
+        master_parsed: Dict[str, Any],
+        customized: Stage2CustomizationResult,
+        projects: List[Any] = None
+    ) -> List[DiffItem]:
         """
-        Generates section-by-section diff items for the frontend comparison view.
+        Generates section-by-section diff items for the frontend comparison view,
+        including Professional Summary, Technical Skills, Experience Bullets, and Project Slots.
         """
         diffs = []
         
-        # Summary diff
+        # 1. Summary diff
         orig_summary = master_parsed.get("summary", "")
         if orig_summary != customized.tailored_summary:
             diffs.append(DiffItem(
@@ -111,7 +121,7 @@ class MarkdownAssembler:
                 change_type="modified"
             ))
             
-        # Skills diff
+        # 2. Skills diff
         orig_skills = master_parsed.get("skills_raw", "")
         new_skills = "\n".join([f"- **{c.category_name}:** {', '.join(c.skills)}" for c in customized.skill_categories])
         diffs.append(DiffItem(
@@ -120,19 +130,50 @@ class MarkdownAssembler:
             modified=new_skills,
             change_type="reordered"
         ))
+
+        # 3. Experience bullet diffs (per employer)
+        master_exps = master_parsed.get("experiences", [])
+        master_by_comp = {e["company"].strip().lower(): e for e in master_exps}
+        for t_exp in customized.experiences:
+            m_exp = master_by_comp.get(t_exp.company.strip().lower())
+            orig_bullets = "\n".join([f"- {b}" for b in (m_exp["bullets"] if m_exp else [])])
+            mod_bullets = "\n".join([f"- {b}" for b in t_exp.bullets])
+            if orig_bullets != mod_bullets:
+                diffs.append(DiffItem(
+                    section=f"Experience: {t_exp.title} | {t_exp.company}",
+                    original=orig_bullets or "[Master Experience Baseline]",
+                    modified=mod_bullets,
+                    change_type="modified"
+                ))
         
-        # Projects diff
+        # 4. Projects diff (lookup actual catalog project baseline if available)
+        projects_by_title = {}
+        if projects:
+            for p in projects:
+                projects_by_title[p.title.strip().lower()] = p
+
+        p1_match = projects_by_title.get(customized.slot1_title.strip().lower())
+        p1_orig = p1_match.full_markdown.strip() if (p1_match and p1_match.full_markdown) else (master_parsed.get("projects_raw") or "[Catalog Project Baseline]")
         diffs.append(DiffItem(
             section="Project Slot 1",
-            original="[Master Resume: Dynamic Slot]",
+            original=p1_orig,
             modified=f"{customized.slot1_title}\n" + "\n".join([f"- {b}" for b in customized.slot1_bullets]),
             change_type="selected"
         ))
         
         slot2_type = "proposed" if customized.slot2_is_proposed else "selected"
+        clean_s2_title = re.sub(r'\s*\(Under Development\)\s*$', '', customized.slot2_title, flags=re.I).strip().lower()
+        p2_match = projects_by_title.get(clean_s2_title)
+        if customized.slot2_is_proposed:
+            p2_orig = "[New 1-2 Day Targeted Prototype Proposal]"
+        elif p2_match and p2_match.full_markdown:
+            p2_orig = p2_match.full_markdown.strip()
+        else:
+            p2_orig = master_parsed.get("projects_raw") or "[Catalog Project Baseline]"
+
         diffs.append(DiffItem(
             section="Project Slot 2",
-            original="[Master Resume: Dynamic Slot]",
+            original=p2_orig,
             modified=f"{customized.slot2_title}\n" + "\n".join([f"- {b}" for b in customized.slot2_bullets]),
             change_type=slot2_type
         ))

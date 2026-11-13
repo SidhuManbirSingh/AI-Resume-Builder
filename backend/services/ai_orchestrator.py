@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from backend.core.security import sanitize_job_description
+from backend.core.security import sanitize_job_description, sanitize_additional_notes
 from backend.services.file_loader import FileLoaderService
 from backend.services.llm_client import get_llm_client
 from backend.services.validator import ResumeValidator
@@ -26,8 +26,9 @@ class AIResumeOrchestrator:
         """
         # Step 1: Sanitize Input
         clean_jd = sanitize_job_description(raw_job_description)
-        if additional_notes:
-            clean_jd = f"{clean_jd}\n\nAdditional Candidate Focus: {additional_notes.strip()}"
+        clean_notes = sanitize_additional_notes(additional_notes) if additional_notes else ""
+        if clean_notes:
+            clean_jd = f"{clean_jd}\n\nAdditional Candidate Focus: {clean_notes}"
 
         # Step 2: Ingest Master Resume & Catalog
         master_raw, master_parsed = FileLoaderService.get_master_resume()
@@ -45,12 +46,24 @@ class AIResumeOrchestrator:
         # Stage 3: Deterministic Invariance Guardrail Validation
         validated_result, validation_warnings = ResumeValidator.validate_and_sanitize(
             master_parsed,
-            stage2_result
+            stage2_result,
+            job_description=clean_jd
         )
+
+        # Resolve GitHub URLs from project catalog
+        projects_by_id = {p.id: p for p in projects}
+        p1 = projects_by_id.get(stage1_result.slot1_project_id)
+        slot1_github_url = p1.github_url if p1 else None
+
+        p2 = projects_by_id.get(stage1_result.slot2_project_id) if not stage1_result.slot2_is_proposed else None
+        slot2_github_url = p2.github_url if p2 else None
+
+        validated_result.slot1_github_url = slot1_github_url
+        validated_result.slot2_github_url = slot2_github_url
 
         # Stage 4: Assemble Markdown
         tailored_markdown = MarkdownAssembler.assemble(master_parsed, validated_result)
-        diff_items = MarkdownAssembler.generate_diffs(master_parsed, validated_result)
+        diff_items = MarkdownAssembler.generate_diffs(master_parsed, validated_result, projects)
 
         # Build Project Slot metadata for UI display
         slot1_meta = ProjectSlot(
@@ -60,7 +73,8 @@ class AIResumeOrchestrator:
             technologies=validated_result.slot1_technologies,
             bullets=validated_result.slot1_bullets,
             is_proposed=False,
-            proposal_rationale=stage1_result.slot1_rationale
+            proposal_rationale=stage1_result.slot1_rationale,
+            github_url=slot1_github_url
         )
 
         slot2_meta = ProjectSlot(
@@ -69,17 +83,24 @@ class AIResumeOrchestrator:
             title=validated_result.slot2_title,
             technologies=validated_result.slot2_technologies,
             bullets=validated_result.slot2_bullets,
-            is_proposed=stage1_result.slot2_is_proposed,
+            is_proposed=validated_result.slot2_is_proposed,
             proposal_rationale=stage1_result.slot2_rationale,
-            implementation_plan=stage1_result.slot2_proposed_plan
+            implementation_plan=stage1_result.slot2_proposed_plan,
+            github_url=slot2_github_url
         )
 
         analysis_summary = {
             "target_role_title": stage1_result.target_role_title,
+            "target_company": stage1_result.target_company,
+            "role_family": stage1_result.role_family,
+            "candidate_name": master_parsed.get("name", "Manbir Singh Sidhu"),
+            "contact_info": master_parsed.get("contact_info", {}),
             "key_technical_requirements": stage1_result.key_technical_requirements,
             "key_responsibilities": stage1_result.key_responsibilities,
             "validation_warnings": validation_warnings,
+            "slot1_project_id": stage1_result.slot1_project_id,
             "slot1_rationale": stage1_result.slot1_rationale,
+            "slot2_project_id": stage1_result.slot2_project_id,
             "slot2_rationale": stage1_result.slot2_rationale,
             "slot2_is_proposed": stage1_result.slot2_is_proposed,
             "slot2_proposed_plan": stage1_result.slot2_proposed_plan
@@ -103,6 +124,7 @@ class AIResumeOrchestrator:
         Generates a tailored, catchy, high-energy cover letter grounded in candidate facts and the target JD.
         """
         clean_jd = sanitize_job_description(raw_job_description)
+        clean_notes = sanitize_additional_notes(additional_notes) if additional_notes else None
 
         if not tailored_markdown or not tailored_markdown.strip():
             master_raw, _ = FileLoaderService.get_master_resume()
@@ -114,7 +136,7 @@ class AIResumeOrchestrator:
         result = llm.generate_cover_letter(
             job_description=clean_jd,
             resume_markdown=resume_ref,
-            additional_notes=additional_notes
+            additional_notes=clean_notes
         )
 
         return CoverLetterResponse(
@@ -133,6 +155,7 @@ class AIResumeOrchestrator:
         Generates two custom outreach versions (LinkedIn message and direct cold email) grounded in candidate facts and the target JD.
         """
         clean_jd = sanitize_job_description(raw_job_description)
+        clean_notes = sanitize_additional_notes(additional_notes) if additional_notes else None
 
         if not tailored_markdown or not tailored_markdown.strip():
             master_raw, _ = FileLoaderService.get_master_resume()
@@ -144,7 +167,7 @@ class AIResumeOrchestrator:
         result = llm.generate_outreach(
             job_description=clean_jd,
             resume_markdown=resume_ref,
-            additional_notes=additional_notes
+            additional_notes=clean_notes
         )
 
         return OutreachResponse(

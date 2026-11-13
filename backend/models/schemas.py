@@ -14,6 +14,8 @@ class ProjectMetadata(BaseModel):
     summary: str
     metrics: Optional[str] = None
     full_markdown: Optional[str] = None
+    github_url: Optional[str] = None
+    github_repo: Optional[str] = None
 
 class ProjectSlot(BaseModel):
     slot_number: int
@@ -24,10 +26,12 @@ class ProjectSlot(BaseModel):
     is_proposed: bool = False
     proposal_rationale: Optional[str] = None
     implementation_plan: Optional[str] = None
+    github_url: Optional[str] = None
 
 class Stage1AnalysisResult(BaseModel):
     target_role_title: str
     target_company: Optional[str] = None
+    role_family: str = "general"  # "facilities", "service_dispatch", "software_it", "security", "general"
     key_technical_requirements: List[str]
     key_responsibilities: List[str]
     slot1_project_id: str
@@ -57,10 +61,12 @@ class Stage2CustomizationResult(BaseModel):
     slot1_title: str
     slot1_technologies: List[str] = Field(default_factory=list)
     slot1_bullets: List[str]
+    slot1_github_url: Optional[str] = None
     slot2_title: str
     slot2_technologies: List[str] = Field(default_factory=list)
     slot2_bullets: List[str]
     slot2_is_proposed: bool = False
+    slot2_github_url: Optional[str] = None
 
 class DiffItem(BaseModel):
     section: str
