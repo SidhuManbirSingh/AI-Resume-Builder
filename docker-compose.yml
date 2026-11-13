@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   resume-tailor:
     build:
@@ -8,14 +6,18 @@ services:
     container_name: resume_tailor_app
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GEMINI_REASONING_API_KEY=${GEMINI_REASONING_API_KEY:-}
+      - GEMINI_REASONING_MODEL=${GEMINI_REASONING_MODEL:-gemini-2.5-pro}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      - MASTER_RESUME_PATH=/app/data/master/master_resume.md
+      - MASTER_RESUME_PATH=/app/data/master/Manbir-OPS-Resume.md
       - PROJECTS_DIR=/app/data/projects
       - OUTPUT_DIR=/app/data/output
       - STATIC_DIR=/app/frontend/static
@@ -26,7 +28,7 @@ services:
       # Output directory mounted read-write for exported resumes & PDFs
       - ./data/output:/app/data/output:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3

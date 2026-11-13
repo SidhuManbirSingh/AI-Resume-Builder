@@ -29,10 +29,30 @@ def sanitize_job_description(raw_text: str) -> str:
             detail=f"Job description too brief ({len(words)} words). Please paste a complete job description (minimum {settings.MIN_JOB_DESCRIPTION_WORDS} words)."
         )
     
-    # Neutralize injection delimiters like </job_description>
-    cleaned = cleaned.replace("</job_description>", "&lt;/job_description&gt;")
-    cleaned = cleaned.replace("<job_description>", "&lt;job_description&gt;")
+    # Neutralize injection delimiters (case-insensitive regex across all XML prompt tags)
+    cleaned = re.sub(
+        r'</?\s*(?:job_description|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog)\s*>',
+        '',
+        cleaned,
+        flags=re.IGNORECASE
+    )
     
+    return cleaned
+
+
+def sanitize_additional_notes(notes: str) -> str:
+    """
+    Sanitizes optional additional_notes against prompt delimiter breakout and excessive length.
+    """
+    if not notes or not notes.strip():
+        return ""
+    cleaned = notes.replace("\x00", "").strip()[:2000]
+    cleaned = re.sub(
+        r'</?\s*(?:job_description|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog)\s*>',
+        '',
+        cleaned,
+        flags=re.IGNORECASE
+    )
     return cleaned
 
 def strip_github_links(text: str) -> str:

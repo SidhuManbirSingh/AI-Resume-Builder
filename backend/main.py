@@ -6,6 +6,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+import logging
 import os
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,8 +26,11 @@ from backend.models.schemas import (
 )
 from backend.services.file_loader import FileLoaderService
 from backend.services.ai_orchestrator import AIResumeOrchestrator
+from backend.services.llm_client import get_llm_client
 from backend.services.pdf_generator import ATSResumePDFGenerator
 from backend.core.security import sanitize_filename
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -34,26 +38,51 @@ app = FastAPI(
     description="Intelligently tailor master resumes to job descriptions while preserving factual accuracy and structure."
 )
 
-# Enable CORS for external frontend or local dev tools
+# Restrict CORS strictly to local same-host origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
+
+@app.on_event("startup")
+def startup_github_sync():
+    """
+    On application startup, checks the user's GitHub for recent projects (last 5)
+    and syncs any newly added projects into data/projects/ automatically.
+    """
+    if getattr(settings, "AUTO_SYNC_GITHUB_PROJECTS", True):
+        try:
+            from backend.services.github_sync import sync_github_projects
+            logger.info("Checking GitHub for newly added/updated projects on startup (User: %s)...", settings.GITHUB_USERNAME)
+            new_projects = sync_github_projects()
+            if new_projects:
+                logger.info(
+                    "GitHub Startup Sync: Created %d new project(s): %s",
+                    len(new_projects), [p["title"] for p in new_projects]
+                )
+            else:
+                logger.info("GitHub Startup Sync: All recent projects are up to date.")
+        except Exception as e:
+            logger.warning("GitHub project sync on startup skipped (offline or network error): %s", e)
 
 @app.get("/api/health")
 def health_check():
     """
-    Status endpoint verifying system configuration and file availability.
+    Status endpoint verifying system configuration, active LLM provider, and file availability.
     """
     master_exists = settings.MASTER_RESUME_PATH.exists()
     projects = FileLoaderService.get_project_catalog()
+    llm_client = get_llm_client()
+    active_provider = getattr(llm_client, "provider_name", settings.LLM_PROVIDER)
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "llm_provider": settings.LLM_PROVIDER,
+        "configured_provider": settings.LLM_PROVIDER,
+        "active_provider": active_provider,
+        "llm_provider": active_provider,
         "master_resume_loaded": master_exists,
         "projects_count": len(projects)
     }
@@ -80,6 +109,25 @@ def get_projects():
         "projects": [p.model_dump() for p in projects]
     }
 
+@app.post("/api/projects/sync-github")
+def trigger_github_sync():
+    """
+    Manually triggers GitHub repository check and sync for new projects into data/projects/.
+    """
+    try:
+        from backend.services.github_sync import sync_github_projects
+        new_projects = sync_github_projects()
+        all_projects = FileLoaderService.get_project_catalog()
+        return {
+            "status": "success",
+            "new_projects_count": len(new_projects),
+            "new_projects": new_projects,
+            "total_catalog_count": len(all_projects)
+        }
+    except Exception:
+        logger.exception("Failed to sync GitHub projects")
+        raise HTTPException(status_code=500, detail="GitHub sync failed due to an internal error.")
+
 @app.post("/api/tailor", response_model=TailoredResumeResponse)
 def tailor_resume(request: JobDescriptionRequest):
     """
@@ -93,8 +141,12 @@ def tailor_resume(request: JobDescriptionRequest):
         return response
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tailoring failed: {str(e)}")
+    except Exception:
+        logger.exception("Unhandled error during /api/tailor execution")
+        raise HTTPException(
+            status_code=500,
+            detail="Tailoring failed due to an internal processing error. Please check server logs."
+        )
 
 @app.post("/api/tailor/cover-letter", response_model=CoverLetterResponse)
 def tailor_cover_letter(request: CoverLetterRequest):
@@ -110,8 +162,12 @@ def tailor_cover_letter(request: CoverLetterRequest):
         return response
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cover letter generation failed: {str(e)}")
+    except Exception:
+        logger.exception("Unhandled error during /api/tailor/cover-letter execution")
+        raise HTTPException(
+            status_code=500,
+            detail="Cover letter generation failed due to an internal processing error."
+        )
 
 @app.post("/api/tailor/outreach", response_model=OutreachResponse)
 def tailor_outreach(request: OutreachRequest):
@@ -127,8 +183,12 @@ def tailor_outreach(request: OutreachRequest):
         return response
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Outreach message generation failed: {str(e)}")
+    except Exception:
+        logger.exception("Unhandled error during /api/tailor/outreach execution")
+        raise HTTPException(
+            status_code=500,
+            detail="Outreach message generation failed due to an internal processing error."
+        )
 
 @app.post("/api/export/pdf")
 def export_pdf(request: ExportRequest):
@@ -148,8 +208,9 @@ def export_pdf(request: ExportRequest):
                 "Content-Disposition": f'attachment; filename="{safe_filename}"'
             }
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+    except Exception:
+        logger.exception("Unhandled error during /api/export/pdf execution")
+        raise HTTPException(status_code=500, detail="PDF generation failed due to an internal rendering error.")
 
 @app.post("/api/export/markdown")
 def export_markdown(request: ExportRequest):
@@ -182,4 +243,4 @@ if static_path.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
