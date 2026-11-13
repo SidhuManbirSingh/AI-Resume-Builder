@@ -4,9 +4,9 @@ Surrey, BC | +1 778-956-1186 | manbirs285@gmail.com | [LinkedIn](https://www.lin
 
 ## **PROFESSIONAL SUMMARY** 
 
-Building Operations Coordinator & Assistant Facility Manager with over 3 years of hands-on commercial property operations experience, paired with leadership as an Acting Assistant Manager and Security Supervisor. Proven expertise conducting daily building and mechanical room rounds (chillers, boilers, pumps, AHUs), managing building automation systems (BAS/BMS), coordinating trade contractors across HVAC, plumbing, and electrical, and maintaining strict OH&S compliance. Certified in Occupational First Aid (OFA Level 1), eligible for 5th Class Power Engineering, and holds a valid BC Driver's License with a reliable personal vehicle. Computer Information Systems background (4.1 GPA) focused on preventative maintenance workflows and computerized building operations. 
+Operations Coordinator & Assistant Manager with over 3 years of hands-on commercial property operations experience, paired with leadership. Proven expertise conducting daily building and mechanical room rounds (chillers, boilers, pumps, electrical panels), managing building automation systems (BAS/BMS), coordinating trade contractors across HVAC, plumbing, and electrical, and maintaining strict OH&S compliance. Certified in Occupational First Aid (OFA Level 1) and holds a valid BC Driver's License with a reliable personal vehicle. Computer Information Systems background (4.1 GPA) focused on preventative maintenance workflows and computerized building operations. 
 
-## **CORE COMPETENCIES** 
+## **Core Competencies** 
 
 Daily Building Rounds & Mechanical Inspections • Preventative Maintenance • Work Order Management (MRI Angus / WPM Plus) • Minor Plumbing & Electrical Repairs • Filter & Belt Changes • Lamp & Ballast Replacement • Drywall & Painting Touch-Ups • Groundskeeping • Contractor & Service Coordination • Tenant Relations • Life Safety & OH&S (JOHSC) • On-Call Emergency Response • BMS/BAS Controls 
 
@@ -16,31 +16,27 @@ Daily Building Rounds & Mechanical Inspections • Preventative Maintenance • 
 
 - **First Aid Certification:** Occupational First Aid (OFA) Level 1 Certification 
 
-- **Building Operations & Power Engineering:** 5th Class Power Engineering (in progress / eligible); BOMA Building Operator coursework / continuous professional development 
+- **Availability & Scheduling:** Immediate full-time availability for commercial operational shifts, rotational schedules, after-hours emergencies, and 24/7 on-call dispatch 
 
-- **Availability:** Fully available for operational shifts, after-hours escalations, and on-call response 
+## **RELEVANT PROJECTS** 
 
-## **RELEVANT OPERATIONS PROJECTS** 
+### **Self-Hosted GitLab CI/CD Platform on Kubernetes (~75 Git Commits)** 
+- **Keywords & Stack:** Kubernetes (Minikube), Docker Compose, NGINX Ingress Controller, Cert-Manager, Automated SSL/TLS, PostgreSQL (`ClusterIP`, PVCs), Prometheus, Grafana, EFK Stack (Elasticsearch, Fluent Bit, Kibana), Bash Automation (`init.sh`, `backup.sh`, `deploy-k8s.sh`), `chmod 600` Hardening, Docker Secrets, 3-Tier Health Probes (Startup, Liveness, Readiness with 10-min grace periods), ~75 Commits of Intensive Systems Engineering 
 
-### **Preventative Maintenance & BMS Compliance Tracking | Applied Project** 
+### **Cotton Weed Detection AI Computer Vision Pipeline — Capstone Project (51 Git Commits)** 
+- **Keywords & Stack:** YOLOv8n, PyTorch, Python, Intel OpenVINO, OpenCV, Flask REST API, React, Docker Compose, UAV/Drone Imagery, Precision Agriculture, Side-by-Side Annotated Video Playback, 0.8489 Overall mAP@50 (93.8% Crop, 76.0% Weed Detection), 3.1ms Real-Time Inference, 51 Commits 
 
-- Designed automated compliance tracking logs and diagnostic tools for Computerized Control Systems (BMS/BAS) to track preventative maintenance schedules, sensor metrics across HVAC units, pumps, boilers, and air handlers. 
+### **Preventative Maintenance & BMS Compliance Tracking** 
+- **Keywords & Stack:** BMS/BAS Control Systems, MRI Angus, WPM Plus, HVAC & Mechanical Telemetry (Chillers, Boilers, Pumps, AHUs), Preventative Maintenance Scheduling, Job Hazard Assessments (JHA), OH&S Compliance, Python, SQL, Power BI 
 
-- Streamlined incident logging, cost-replacement analysis, and work order tracking across enterprise facility management platforms, improving response times and technical dispatch efficiency. 
+### **Commercial Facilities Workflow & Service Contract Optimization** 
+- **Keywords & Stack:** Preventative Maintenance Workflows, Service Contract & Trade Dispatch Coordination, ~40% Manual Step Reduction, Environmental & Risk Management Checklists, Life Safety Systems Testing, KPI & SLA Tracking 
 
-- Developed standardized maintenance logs and Job Hazard Assessments (JHA) in full compliance with OH&S guidelines and enterprise facility standards. 
+### **Azure Cloud Security & Compliance Auditor** 
+- **Keywords & Stack:** Python, Azure SDK, Entra ID / Active Directory IAM Auditing, Network Security Groups (NSG), Storage Account TLS & Encryption Compliance, Automated JSON/CSV Security Reporting 
 
-- Tools used: BMS/BAS Simulation Control Interfaces, Python, SQL, Work Order Management Systems, Power BI. 
-
-### **Commercial Facilities Workflow & Service Contract Optimization | Applied Simulation** 
-
-- Modeled commercial property Preventative Maintenance and Service Contract Coordination workflows, identifying operational bottlenecks and redesigning dispatch protocols to reduce manual steps by ~40%. 
-
-- Designed governance artifacts including Environmental & Risk Management Inspection checklists, Life Safety Systems testing protocols, and Leasehold Improvements guidelines. 
-
-- Facilitated a peer workshop to walk teammates through the new process, gathering feedback and iterating on operational protocols. 
-
-- Produced end-user documentation and a KPI tracking sheet (adoption rate, time-saved) to measure impact. 
+### **Canadian Labor Market AI Exposure Map Dashboard** 
+- **Keywords & Stack:** Python, JavaScript, Google Gemini API, ETL Data Pipeline, Statistics Canada & NOC 2021 (500+ Occupations), Interactive Treemap Visualization, HTML5/CSS3 
 
 ## **PROFESSIONAL EXPERIENCE** 
 
@@ -92,7 +88,7 @@ _University of the Fraser Valley (Attended) | Cumulative GPA: 4.1 / 4.3_
 
 ## **TECHNICAL SKILLS & BUILDING SYSTEMS** 
 
-- **Mechanical, Electrical & Building Systems:** Mechanical & electrical troubleshooting (pumps, motors, boilers, cooling towers, chillers, AHUs), minor plumbing repairs, lamp/ballast replacements, filter & belt changes, HVAC preventative maintenance, BMS/BAS control operations, OFA Level 1, Valid BC Driver's License & Reliable Vehicle 
+- **Mechanical, Electrical & Building Systems:** Mechanical & electrical troubleshooting (pumps, motors, boilers, cooling towers, chillers, AHUs), minor plumbing repairs, lamp/ballast replacements, filter & belt changes, HVAC preventative maintenance, BMS/BAS control operations 
 
 - **Platforms & Operations:** Work Order Management (MRI Angus, WPM Plus), Life Safety Systems, Elevating Devices, Building Envelope, Job Hazard Assessments (JHA), OH&S Compliance, Drywall & Paint Maintenance, Groundskeeping 
 

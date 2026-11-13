@@ -1,6 +1,8 @@
 ---
 id: glossy_rides_web_app
 title: Glossy Rides Detailing Single-Page Web Application
+github_repo: glossy-rides
+github_url: https://github.com/SidhuManbirSingh/glossy-rides
 technologies:
   - React 18
   - JavaScript
@@ -14,7 +16,7 @@ summary: Production-ready responsive single-page web application for an automoti
 metrics: Fully responsive across mobile, tablet, and desktop viewports; integrated client-side validation and asynchronous REST API proxies.
 ---
 
-### Glossy Rides Detailing Single-Page Web Application
+### Glossy Rides Detailing Single-Page Web Application | [GitHub](https://github.com/SidhuManbirSingh/glossy-rides)
 *React 18 | JavaScript | Axios | CSS3 | REST APIs | Responsive UI*
 
 - Engineered a responsive single-page application (SPA) using React 18, React Hooks, and modern component architecture.

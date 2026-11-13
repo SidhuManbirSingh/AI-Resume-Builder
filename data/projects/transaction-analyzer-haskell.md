@@ -1,6 +1,8 @@
 ---
 id: haskell_transaction_analyzer
 title: E-Commerce Functional Transaction Analyzer
+github_repo: Transaction-Analyser-Haskell
+github_url: https://github.com/SidhuManbirSingh/Transaction-Analyser-Haskell
 technologies:
   - Haskell
   - GHC
@@ -13,7 +15,7 @@ summary: High-performance transaction processing engine written in Haskell, demo
 metrics: Stack-safe aggregation on large transaction datasets using foldl' strict evaluation; formatted fixed-width tabular terminal outputs.
 ---
 
-### E-Commerce Functional Transaction Analyzer
+### E-Commerce Functional Transaction Analyzer | [GitHub](https://github.com/SidhuManbirSingh/Transaction-Analyser-Haskell)
 *Haskell | GHC | Functional Programming | Data Pipelines*
 
 - Designed a pure functional transaction processing system in Haskell utilizing custom algebraic data types with record syntax.

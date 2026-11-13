@@ -1,6 +1,7 @@
 ---
 id: azure_cloud_security_auditor
 title: Azure Cloud Security & Compliance Auditor
+github_url: https://github.com/Balkar-S/Cloud-Security-Auditor
 technologies:
   - Python
   - Azure SDK
@@ -15,7 +16,7 @@ summary: Automated cloud security auditing tool detecting misconfigurations, ove
 metrics: 100% automated scanning across Storage Accounts, Network Security Groups, and IAM roles; generates structured JSON and CSV audit reports.
 ---
 
-### Azure Cloud Security & Compliance Auditor
+### Azure Cloud Security & Compliance Auditor | [GitHub](https://github.com/Balkar-S/Cloud-Security-Auditor)
 *Python | Azure SDK | Cloud Security | IAM | NSG*
 
 - Developed an automated security auditing script for Azure cloud environments detecting infrastructure misconfigurations and compliance violations.
