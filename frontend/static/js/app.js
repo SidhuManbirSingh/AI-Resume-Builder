@@ -5,6 +5,7 @@
 
 const state = {
   originalMarkdown: '',
+  originalGeneratedMarkdown: '',
   tailoredMarkdown: '',
   coverLetterMarkdown: '',
   outreach: {
@@ -19,7 +20,7 @@ const state = {
 };
 
 const SAMPLE_JDS = {
-  backend: `Commercial Facilities Operations Coordinator & Building Automation Specialist
+  facilities: `Commercial Facilities Operations Coordinator & Building Automation Specialist
 
 Company: Apex Commercial Property Management
 Location: Vancouver / Surrey, BC
@@ -40,7 +41,7 @@ Requirements:
 - Experience with work order management systems (Angus, WPM, or equivalent).
 - Valid BC Driver's License with reliable personal vehicle. OFA Level 1 certification preferred.`,
 
-  ai: `Senior Cloud & Distributed Systems Software Engineer
+  cloud: `Senior Cloud & Distributed Systems Software Engineer
 
 Company: Distributed Cloud Networks
 Location: Remote
@@ -59,6 +60,8 @@ Requirements:
 - Deep familiarity with Linux systems, network protocols, and relational database optimization.
 - Strong track record designing fault-tolerant cloud platforms.`
 };
+SAMPLE_JDS.backend = SAMPLE_JDS.facilities;
+SAMPLE_JDS.ai = SAMPLE_JDS.cloud;
 
 // DOM Elements container
 const elements = {};
@@ -73,8 +76,8 @@ function initElements() {
   elements.generateCoverLetterBtn = document.getElementById('generateCoverLetterBtn');
   elements.generateOutreachBtn = document.getElementById('generateOutreachBtn');
   elements.clearJdBtn = document.getElementById('clearJdBtn');
-  elements.loadBackendBtn = document.getElementById('loadSampleBackendBtn');
-  elements.loadAIBtn = document.getElementById('loadSampleAIBtn');
+  elements.loadBackendBtn = document.getElementById('loadSampleFacilitiesBtn') || document.getElementById('loadSampleBackendBtn');
+  elements.loadAIBtn = document.getElementById('loadSampleCloudBtn') || document.getElementById('loadSampleAIBtn');
 
   // Tabs
   elements.tabTailored = document.getElementById('tabTailored');
@@ -229,6 +232,7 @@ function setupEventListeners() {
   if (elements.resetEditorBtn) {
     elements.resetEditorBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      state.tailoredMarkdown = state.originalGeneratedMarkdown || state.tailoredMarkdown;
       if (elements.markdownEditor) elements.markdownEditor.value = state.tailoredMarkdown;
       renderMarkdownResume(state.tailoredMarkdown, elements.tailoredRender);
     });
@@ -313,6 +317,7 @@ async function handleGenerateResume() {
     }
 
     const data = await response.json();
+    state.originalGeneratedMarkdown = data.tailored_markdown;
     state.tailoredMarkdown = data.tailored_markdown;
     state.analysis = data.analysis;
     state.diffs = data.diffs || [];
@@ -356,9 +361,11 @@ function switchTab(tabId) {
     if (!t.btn || !t.panel) return;
     if (t.id === tabId) {
       t.btn.classList.add('active');
+      t.btn.setAttribute('aria-selected', 'true');
       t.panel.classList.remove('hidden');
     } else {
       t.btn.classList.remove('active');
+      t.btn.setAttribute('aria-selected', 'false');
       t.panel.classList.add('hidden');
     }
   });
@@ -392,8 +399,10 @@ function renderMarkdownResume(markdownText, targetElement) {
       if (inBullets) { html += '</ul>'; inBullets = false; }
       const title = line.substring(4);
       const isProposed = title.includes('(Targeted Implementation') || title.includes('(Proposed') || title.includes('(Under Development');
+      let titleHtml = escapeHtml(title);
+      titleHtml = titleHtml.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline; font-weight: 600;">$1</a>');
       html += `<div class="r-job-header" style="margin-top: 10px;">
-        <span>${escapeHtml(title)}</span>
+        <span>${titleHtml}</span>
         ${isProposed ? '<span class="proposal-tag">UNDER DEVELOPMENT</span>' : ''}
       </div>`;
     } else if (line.startsWith('*') && line.endsWith('*')) {
@@ -404,7 +413,7 @@ function renderMarkdownResume(markdownText, targetElement) {
         html += '<ul>';
         inBullets = true;
       }
-      const bulletText = line.substring(2);
+      const bulletText = escapeHtml(line.substring(2));
       const formatted = bulletText.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
       html += `<li>${formatted}</li>`;
     } else {

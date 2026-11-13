@@ -41,8 +41,8 @@
             <label class="field-label" for="jobDescriptionInput" style="margin-bottom: 0;">PASTE COMPLETE JOB DESCRIPTION &darr;</label>
             <div style="font-family: var(--dp-typography-mono); font-size: 0.7rem; color: var(--dp-color-ink-muted); display: flex; gap: 0.35rem; align-items: center;">
               <span>SAMPLES:</span>
-              <button id="loadSampleBackendBtn" class="sample-link" type="button">[ FACILITIES / OPS ]</button>
-              <button id="loadSampleAIBtn" class="sample-link" type="button">[ CLOUD / SYSTEMS ]</button>
+              <button id="loadSampleFacilitiesBtn" class="sample-link" type="button">[ FACILITIES / OPS ]</button>
+              <button id="loadSampleCloudBtn" class="sample-link" type="button">[ CLOUD / SYSTEMS ]</button>
             </div>
           </div>
           <textarea
@@ -101,27 +101,27 @@
 
       <!-- Tab Navigation -->
       <div class="tabs-bar" role="tablist">
-        <button id="tabTailored" class="tab-item active" role="tab">
+        <button id="tabTailored" class="tab-item active" role="tab" aria-selected="true">
           <span class="tab-index">01</span>
           <span>TAILORED RESUME</span>
         </button>
-        <button id="tabCoverLetter" class="tab-item" role="tab">
+        <button id="tabCoverLetter" class="tab-item" role="tab" aria-selected="false">
           <span class="tab-index">02</span>
           <span>COVER LETTER</span>
         </button>
-        <button id="tabOutreach" class="tab-item" role="tab">
+        <button id="tabOutreach" class="tab-item" role="tab" aria-selected="false">
           <span class="tab-index">03</span>
           <span>OUTREACH</span>
         </button>
-        <button id="tabOriginal" class="tab-item" role="tab">
+        <button id="tabOriginal" class="tab-item" role="tab" aria-selected="false">
           <span class="tab-index">04</span>
           <span>ORIGINAL MASTER</span>
         </button>
-        <button id="tabDiff" class="tab-item" role="tab">
+        <button id="tabDiff" class="tab-item" role="tab" aria-selected="false">
           <span class="tab-index">05</span>
           <span>DIFF COMPARISON</span>
         </button>
-        <button id="tabEditor" class="tab-item" role="tab">
+        <button id="tabEditor" class="tab-item" role="tab" aria-selected="false">
           <span class="tab-index">06</span>
           <span>MARKDOWN EDITOR</span>
         </button>
