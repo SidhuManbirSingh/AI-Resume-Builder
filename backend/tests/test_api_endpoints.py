@@ -5,11 +5,14 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import unittest
+from unittest.mock import patch
+import requests
 from fastapi import HTTPException
 from backend.main import (
     health_check,
     get_master_resume,
     get_projects,
+    trigger_github_sync,
     tailor_resume,
     tailor_cover_letter,
     tailor_outreach,
@@ -45,6 +48,14 @@ class TestAPIEndpointsDirect(unittest.TestCase):
         data = get_projects()
         self.assertGreaterEqual(data["count"], 3)
         self.assertTrue(len(data["projects"]) >= 3)
+
+    def test_github_sync_endpoint(self):
+        with patch("backend.services.github_sync.sync_github_projects", return_value=[]) as mock_sync:
+            res = trigger_github_sync()
+            self.assertEqual(res["status"], "success")
+            self.assertEqual(res["new_projects_count"], 0)
+            self.assertGreaterEqual(res["total_catalog_count"], 3)
+            mock_sync.assert_called_once()
 
     def test_tailor_endpoint_success(self):
         master_data = get_master_resume()
@@ -129,6 +140,32 @@ class TestAPIEndpointsDirect(unittest.TestCase):
         self.assertIn("Apex Commercial", response.email_body)
         self.assertIn("4.1 GPA", response.email_subject)
         self.assertIn("Commercial Facilities Operations Coordinator", response.target_role_title)
+
+    def test_tailor_endpoint_sanitizes_network_exception_leak(self):
+        """
+        Regression Test 5: Simulated network exception during /api/tailor verifying the HTTP 500
+        response detail never contains 'AIza' or 'key='.
+        """
+        settings.LLM_PROVIDER = "gemini"
+        settings.GEMINI_API_KEY = "AIzaSySecretKeyLeakTest999"
+        req = JobDescriptionRequest(
+            job_description=(
+                "Commercial Facilities Operations Coordinator\n"
+                "We are seeking an experienced Building Operations Coordinator to inspect mechanical rooms, "
+                "chillers, boilers, AHUs, and manage MRI Angus and WPM Plus work order dispatch."
+            )
+        )
+        simulated_exc = requests.exceptions.ConnectionError(
+            "HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): "
+            "Max retries exceeded with url: /v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSySecretKeyLeakTest999"
+        )
+        with patch("backend.llm.gemini.requests.post", side_effect=simulated_exc):
+            with self.assertRaises(HTTPException) as ctx:
+                tailor_resume(req)
+            self.assertEqual(ctx.exception.status_code, 500)
+            detail = str(ctx.exception.detail)
+            self.assertNotIn("AIza", detail)
+            self.assertNotIn("key=", detail)
 
 if __name__ == "__main__":
     unittest.main()

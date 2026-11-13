@@ -1,12 +1,11 @@
 # AI-Powered Resume Tailoring System
 
-A web application that tailors an existing master resume to specific job descriptions with precision and factual fidelity.
+A local-first web application that tailors an existing master resume, cover letter, and outreach messages to specific job descriptions with strict factual fidelity and deterministic ATS-ready PDF compilation.
 
 Unlike generative resume tools that hallucinate employment history or rewrite documents from scratch, this system follows an **Invariable Baseline, Targeted Modification** paradigm:
-- **Structural Invariance:** The master resume's layout, structure, company names, job titles, employment dates, and educational credentials are immutable.
-- **Selective Customization:** Only targeted sections (Professional Summary, bullet point emphasis in Experience, Project Selection/Proposal, and Technical Skills grouping) are tuned.
-- **Zero AI in Document Layout:** The AI outputs structured semantic data; a deterministic rendering engine compiles this into clean Markdown and an ATS-friendly, single-column PDF.
-- **Mandatory Privacy & ATS Rules:** Automatic sanitization strips GitHub profile links (Rule 4.8) while preserving LinkedIn, email, and phone contacts.
+- **Structural Invariance:** The master resume's layout, company names, job titles, employment dates, and educational credentials are immutable and enforced by `ResumeValidator`.
+- **Role-Family Aware Customization:** Automatically classifies postings into role families (`facilities`, `service_dispatch`, `software_it`, `security`, `general`) so tailoring rules, skill categories, and experience emphasis match the target domain without cross-contaminating keywords.
+- **Zero AI in Document Layout:** The LLM outputs structured semantic JSON (validated against Pydantic and Gemini `responseSchema`); a pure-Python deterministic PDF engine (`ATSResumePDFGenerator`) compiles this into clean Markdown and an ATS-friendly single-column PDF with WinAnsiEncoding and clickable blue contact links.
 
 ---
 
@@ -19,30 +18,28 @@ Unlike generative resume tools that hallucinate employment history or rewrite do
                                      |
                                      v
 +--------------------------------------------------------------------------+
-|                       Stage 1: Semantic Analysis                         |
-|  - Ingests Master Resume (read-only) & Project Catalog                   |
-|  - Extracts top JD competencies & domain keywords                        |
-|  - Evaluates catalog: Selects Slot 1 (Best Existing Project)             |
-|  - Identifies gaps: Decides Slot 2 (Existing vs 1-2 Day Proposed Project)|
+|             Stage 0 & 1: JD Structuring & Semantic Analysis              |
+|  - Strips raw job-board noise (headers, pay/benefits footers)            |
+|  - Classifies role_family (facilities, service_dispatch, software_it)    |
+|  - Evaluates catalog: Selects Slot 1 & Slot 2 from data/projects/        |
 +------------------------------------+-------------------------------------+
                                      |
                                      v
 +--------------------------------------------------------------------------+
 |                     Stage 2: Targeted Customization                      |
-|  - Adapts Professional Summary for target alignment                      |
-|  - Re-anchors Experience bullets (highlights transferable skills)        |
-|  - Formats Project Slot 1 (existing factual work)                        |
-|  - Formats Project Slot 2 (transparently labeled proposed project)       |
-|  - Reorders Technical Skills categories based on JD relevance            |
+|  - Adapts Professional Summary opening with the exact target role title  |
+|  - Tunes Experience bullets while preserving employer/title/date truth   |
+|  - Selects & formats domain-aligned projects                             |
+|  - Reorders Technical Skills categories (preserving parenthetical lists) |
 +------------------------------------+-------------------------------------+
                                      |
                                      v
 +--------------------------------------------------------------------------+
 |                 Stage 3: Invariance Guardrails & Assembly                |
-|  - Asserts exact match of employers, titles, and dates against master    |
-|  - Strips GitHub profile URLs                                            |
-|  - Enforces "(Targeted Implementation / Prototype)" badge on Slot 2     |
-|  - Assembles ATS-friendly Markdown & computes visual section diffs       |
+|  - Matches experiences by normalized (company, title) key                |
+|  - Sorts work history in reverse-chronological order via date parsing    |
+|  - Strips unverified certifications not present in the master resume     |
+|  - Assembles ATS-friendly Markdown & side-by-side section diffs          |
 +------------------------------------+-------------------------------------+
                                      |
                   +------------------+------------------+
@@ -58,38 +55,7 @@ Unlike generative resume tools that hallucinate employment history or rewrite do
 
 ## Quickstart
 
-### Option 1: Run with Docker Compose (Recommended)
-
-Requires Docker and Docker Compose installed.
-
-1. **Clone and enter repository:**
-   ```bash
-   cd e:\resume-builder
-   ```
-
-2. **Copy environment variables:**
-   ```bash
-   cp .env.example .env
-   ```
-   *(By default, `LLM_PROVIDER=mock` is active, allowing full testing without external API keys. Set `LLM_PROVIDER=anthropic` or `openai` to use live models).*
-
-3. **Launch the application:**
-   ```bash
-   docker compose up --build
-   ```
-
-4. **Access the web interface:**
-   Open your browser to:
-   [http://localhost:8000](http://localhost:8000)
-
-5. **Stop the application:**
-   ```bash
-   docker compose down
-   ```
-
----
-
-### Option 2: Run Locally with Python
+### Option 1: Run Locally with Python
 
 Requires Python 3.10+ (Python 3.12 verified).
 
@@ -98,13 +64,35 @@ Requires Python 3.10+ (Python 3.12 verified).
    pip install -r backend/requirements.txt
    ```
 
-2. **Run the server:**
+2. **Configure environment variables (`.env`):**
+   ```env
+   LLM_PROVIDER=gemini
+   GEMINI_API_KEY=your_gemini_api_key
+   GEMINI_MODEL=gemini-2.5-flash
+   GEMINI_REASONING_API_KEY=your_optional_reasoning_key
+   GEMINI_REASONING_MODEL=gemini-2.5-pro
+   MASTER_RESUME_PATH=data/master/Manbir-OPS-Resume.md
+   ```
+
+3. **Run the server (bound to localhost `127.0.0.1`):**
    ```bash
    python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
    ```
 
-3. **Open the browser:**
+4. **Open the browser:**
    Navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+---
+
+### Option 2: Run with Docker Compose
+
+1. **Launch the application:**
+   ```bash
+   docker compose up --build
+   ```
+
+2. **Access the web interface:**
+   Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ---
 
@@ -112,114 +100,90 @@ Requires Python 3.10+ (Python 3.12 verified).
 
 ```
 resume-builder/
-├── docker-compose.yml              # Docker orchestration with read-only data mounts
+├── docker-compose.yml              # Docker orchestration bound to 127.0.0.1:8000
 ├── Dockerfile                      # Production container build
-├── .env.example                    # Environment variable configuration template
+├── .dockerignore                   # Excludes .env, .git, caches, and output artifacts
 ├── README.md                       # Documentation & setup guide
+│
+├── scripts/
+│   └── sync_github_projects.py     # CLI tool to check GitHub profile & sync recent projects
 │
 ├── data/                           # Application Data Assets
 │   ├── master/
-│   │   └── master_resume.md        # The immutable master resume baseline
+│   │   ├── Manbir-OPS-Resume.md    # Primary operations & CIS master resume
+│   │   └── master_resume.md        # Fallback template resume
 │   ├── projects/                   # Markdown project catalog with YAML frontmatter
-│   │   ├── cloud_cost_optimizer.md
-│   │   ├── event_stream_pipeline.md
-│   │   ├── kubernetes_auto_scaler.md
-│   │   └── rag_knowledge_search.md
+│   │   ├── preventative_maintenance_bms_tracking.md
+│   │   ├── commercial_facilities_workflow_optimization.md
+│   │   ├── gitlab_k8s_platform.md
+│   │   ├── azure_cloud_security_auditor.md
+│   │   ├── canadian_ai_exposure_dashboard.md
+│   │   └── cotton_weed_ai_pipeline.md
 │   └── output/                     # Generated tailored resumes (.md and .pdf)
 │
 ├── backend/
-│   ├── main.py                     # FastAPI REST API & static file mount
-│   ├── requirements.txt            # Python dependencies
+│   ├── main.py                     # FastAPI REST API (localhost-bound, sanitized errors)
+│   ├── requirements.txt            # Minimal Python dependencies
 │   ├── core/
-│   │   ├── config.py               # Settings & environment parser
-│   │   └── security.py             # JD sanitization & GitHub link stripper (Rule 4.8)
+│   │   ├── config.py               # Settings & hot-reloading .env parser
+│   │   └── security.py             # Prompt delimiter & filename sanitization
+│   ├── llm/                        # Modular Multi-Provider LLM Package
+│   │   ├── __init__.py             # Factory (get_llm_client) & exports
+│   │   ├── base.py                 # BaseLLMClient & Stage 0 JD structurer
+│   │   ├── prompts.py              # Role-family prompt builders & JSON schemas
+│   │   ├── gemini.py               # Gemini client (x-goog-api-key header, responseSchema, retry)
+│   │   ├── anthropic.py            # Anthropic Claude client
+│   │   ├── openai.py               # OpenAI GPT-4o client
+│   │   └── mock.py                 # Deterministic offline engine
 │   ├── models/
-│   │   └── schemas.py              # Pydantic schemas for LLM and API contracts
+│   │   └── schemas.py              # Pydantic schemas for LLM & API contracts
 │   ├── services/
-│   │   ├── file_loader.py          # Read-only master resume & project parser
-│   │   ├── llm_client.py           # Multi-provider client (Mock, Anthropic, OpenAI)
-│   │   ├── ai_orchestrator.py      # Multi-stage AI execution pipeline
-│   │   ├── validator.py            # Factual invariance guardrails
-│   │   ├── markdown_assembler.py   # Assembles ATS Markdown & generates visual diffs
-│   │   └── pdf_generator.py        # Deterministic, pure-Python ATS PDF generator
-│   ├── templates/
-│   │   └── document/
-│   │       ├── resume_print.html   # HTML/CSS Paged Media template
-│   │       └── resume_print.css
+│   │   ├── file_loader.py          # Read-only master resume & project catalog parser
+│   │   ├── llm_client.py           # Backward-compatible facade for backend.llm
+│   │   ├── ai_orchestrator.py      # Multi-stage tailoring, cover letter & outreach orchestrator
+│   │   ├── validator.py            # Factual invariance & certification guardrails
+│   │   ├── markdown_assembler.py   # ATS Markdown assembly & side-by-side section diffs
+│   │   └── pdf_generator.py        # Pure-Python ATS PDF generator (WinAnsiEncoding, /Info)
 │   └── tests/
-│       ├── test_tailoring.py       # Unit tests for invariance rules & pipelines
-│       └── test_api_endpoints.py   # Direct API route handler test suite
+│       ├── test_tailoring.py       # Unit & regression tests for parser, validator, LLM, and PDF
+│       └── test_api_endpoints.py   # API route & error-sanitization tests
 │
 └── frontend/
     └── static/
-        ├── index.html              # Kinetic poster layout & dual previews
+        ├── index.html              # Kinetic layout with Resume, Cover Letter, Outreach & Diffs
         ├── css/
-        │   └── kinetic.css         # Kinetic design system (authoritative tokens & styles)
+        │   └── kinetic.css         # Kinetic design system
         └── js/
-            └── app.js              # Decoupled application logic controller
-```
-
----
-
-## Resume Customization & Preservation Rules
-
-The system strictly enforces the mandatory constraints:
-
-1. **Employment History Invariance:** Job titles, company names, employment dates, locations, and degree credentials are validated against the master resume and restored if any tampering occurs.
-2. **Project Slots:**
-   - **Slot 1 (Existing Project):** Ranked and selected from the `data/projects/` catalog based on JD semantic relevance.
-   - **Slot 2 (Complementary Project):** If a required technology in the JD is missing from the existing catalog, proposes a realistic, 1–2 day deliverable explicitly badged as `(Targeted Implementation / Prototype)`. If existing projects already cover the tech stack strongly, selects a second existing project instead.
-3. **Contact Sanitization (Rule 4.8):** All references matching `github.com/...` are automatically stripped from the contact header and body, while preserving LinkedIn, email, and phone numbers.
-4. **ATS Friendly Layout:** Renders single-column standard headers (`Professional Summary`, `Technical Skills`, `Professional Experience`, `Projects`, `Education`) with selectable vector text.
-
----
-
-## Configuration & LLM Providers
-
-Edit `.env` to configure your preferred LLM provider:
-
-### 1. Mock Engine (Default out-of-the-box)
-```env
-LLM_PROVIDER=mock
-```
-Runs locally with zero external API calls. Performs intelligent keyword matching, project ranking, and targeted tuning. Ideal for offline work and automated testing.
-
-### 2. Anthropic Claude (Claude 3.5 Sonnet)
-```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-api03-...
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
-```
-
-### 3. OpenAI (GPT-4o)
-```env
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
+            └── app.js              # Frontend controller (XSS-hardened preview & state management)
 ```
 
 ---
 
 ## Running the Automated Test Suite
 
-Run the complete test suite:
 ```bash
 python -m unittest discover -s backend/tests
 ```
 
-This verifies:
-- Read-only master resume ingestion
-- YAML frontmatter project catalog parsing
-- GitHub profile link stripping (Rule 4.8)
-- Invariance validator restoring tampered employers/titles/dates
-- Proposed project transparent labeling (Rule 3.C)
-- Deterministic ATS PDF compilation
-- Direct API endpoint handling
-
 ---
 
-## Security & Local Development Considerations
+## Automatic GitHub Project Sync
 
-1. **Volume Mount Safety:** In `docker-compose.yml`, `./data/master` and `./data/projects` are mounted with the `:ro` (read-only) flag, guaranteeing that the original files cannot be overwritten even if application code attempts a write operation.
-2. **Indirect Prompt Injection:** User-submitted job descriptions are parsed with character limits and wrapped in strict `<job_description>` delimiters in the LLM prompts with explicit system instructions to treat content strictly as text data rather than instructions.
-3. **API Key Isolation:** API keys remain strictly within `.env` on the host and are never exposed to client-side code.
+The system automatically checks your GitHub profile (`SidhuManbirSingh`) on server startup:
+- Fetches the last 5 recently updated/pushed repositories.
+- Compares against existing projects in `data/projects/`.
+- If a new project is detected, it scrapes the repository metadata, languages, and README, generates a resume-grade markdown project file with YAML frontmatter, and adds it to your catalog.
+- Offline-safe: if network is unavailable, startup proceeds without disruption.
+
+You can also run the sync manually at any time:
+```bash
+# Check last 5 projects (default)
+python scripts/sync_github_projects.py
+
+# Check custom limit or username
+python scripts/sync_github_projects.py --limit 5 --username SidhuManbirSingh
+```
+Or trigger it via API:
+```bash
+curl -X POST http://127.0.0.1:8000/api/projects/sync-github
+```
