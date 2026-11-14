@@ -43,4 +43,5 @@ data/output/*
 *.swo
 .DS_Store
 Thumbs.db
+data/*
 
