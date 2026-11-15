@@ -249,6 +249,13 @@ static_path = settings.STATIC_DIR
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def serve_favicon():
+        fav_svg = static_path / "favicon.svg"
+        if fav_svg.exists():
+            return FileResponse(str(fav_svg), media_type="image/svg+xml", headers=NO_CACHE_HEADERS)
+        return Response(status_code=404)
+
     @app.get("/")
     def serve_frontend():
         index_file = static_path / "index.html"

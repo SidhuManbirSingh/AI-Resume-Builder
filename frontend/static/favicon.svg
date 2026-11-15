@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#101010" />
+  <rect x="2" y="2" width="60" height="60" rx="10" fill="none" stroke="#ff6b00" stroke-width="2.5" />
+  <!-- Minimalist Document Silhouette with Folded Corner -->
+  <path d="M18 14 H38 L46 22 V50 H18 Z" fill="#171717" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" />
+  <path d="M38 14 V22 H46" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" />
+  <!-- ATS Target Accent Lines -->
+  <line x1="24" y1="28" x2="40" y2="28" stroke="#ff6b00" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="24" y1="34" x2="36" y2="34" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+  <line x1="24" y1="40" x2="38" y2="40" stroke="#ff6b00" stroke-width="2" stroke-linecap="round" />
+  <line x1="24" y1="44" x2="32" y2="44" stroke="#a3a3a3" stroke-width="1.5" stroke-linecap="round" />
+</svg>
