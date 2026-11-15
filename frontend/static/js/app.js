@@ -117,10 +117,13 @@ function initElements() {
   elements.processingIndicator = document.getElementById('processingIndicator');
   elements.processingStepText = document.getElementById('processingStepText');
   elements.analysisCard = document.getElementById('analysisCard');
+  elements.atsScoreBadge = document.getElementById('atsScoreBadge');
   elements.targetRoleBadge = document.getElementById('targetRoleBadge');
   elements.keyTechBadges = document.getElementById('keyTechBadges');
+  elements.reqMatrixBadges = document.getElementById('reqMatrixBadges');
   elements.slot1Desc = document.getElementById('slot1Desc');
   elements.slot2Desc = document.getElementById('slot2Desc');
+  elements.qaReportBadge = document.getElementById('qaReportBadge');
 
   // Exports
   elements.downloadMarkdownBtn = document.getElementById('downloadMarkdownBtn');
@@ -483,6 +486,24 @@ function renderInsights(analysis, slots) {
   if (!analysis || !elements.analysisCard) return;
 
   elements.analysisCard.classList.remove('hidden');
+
+  if (elements.atsScoreBadge) {
+    const ats = analysis.ats_score;
+    if (ats && typeof ats.overall_score === 'number') {
+      const scoreColor = ats.overall_score >= 75 ? '#22c55e' : (ats.overall_score >= 50 ? 'var(--dp-color-accent)' : '#ef4444');
+      elements.atsScoreBadge.innerHTML = `
+        <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+          <span style="font-size: 20px; font-weight: 700; color: ${scoreColor}; font-family: var(--dp-typography-mono);">${escapeHtml(String(ats.overall_score))} / 100</span>
+          <span style="font-size: 11px; color: var(--dp-color-ink-muted); font-family: var(--dp-typography-mono);">
+            T: ${escapeHtml(String(ats.technical_overlap))}% | R: ${escapeHtml(String(ats.responsibility_alignment))}% | D: ${escapeHtml(String(ats.domain_relevance))}% | K: ${escapeHtml(String(ats.keyword_coverage))}%
+          </span>
+        </div>
+      `;
+    } else {
+      elements.atsScoreBadge.textContent = '-';
+    }
+  }
+
   if (elements.targetRoleBadge) {
     elements.targetRoleBadge.textContent = analysis.target_role_title || 'Facilities Specialist';
   }
@@ -496,9 +517,37 @@ function renderInsights(analysis, slots) {
     `).join('');
   }
 
+  if (elements.reqMatrixBadges) {
+    const matrix = analysis.requirement_matrix || [];
+    if (matrix.length > 0) {
+      elements.reqMatrixBadges.innerHTML = matrix.slice(0, 6).map(item => {
+        let lvlBg = '#7f1d1d';
+        let lvlFg = '#fecaca';
+        if (item.match_level === 'Strong') {
+          lvlBg = '#065f46';
+          lvlFg = '#a7f3d0';
+        } else if (item.match_level === 'Partial') {
+          lvlBg = '#78350f';
+          lvlFg = '#fde68a';
+        }
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 11px; font-family: var(--dp-typography-mono);">
+            <span style="color: var(--dp-color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.candidate_evidence || '')}">${escapeHtml(item.requirement)}</span>
+            <span style="background: ${lvlBg}; color: ${lvlFg}; padding: 1px 6px; font-size: 10px; font-weight: 700; flex-shrink: 0;">${escapeHtml(item.match_level)} (${escapeHtml(item.provenance)})</span>
+          </div>
+        `;
+      }).join('');
+    } else {
+      elements.reqMatrixBadges.textContent = '-';
+    }
+  }
+
   const slot1 = (slots || []).find(s => s.slot_number === 1);
   if (slot1 && elements.slot1Desc) {
-    elements.slot1Desc.innerHTML = `<span style="color: var(--dp-color-ink);">${escapeHtml(slot1.title)}</span><br><span style="color: var(--dp-color-ink-muted); font-size: 11px; font-family: var(--dp-typography-mono);">${escapeHtml(slot1.proposal_rationale || '')}</span>`;
+    const s1ScoreBadge = (typeof slot1.relevance_score === 'number')
+      ? `<span style="background: #065f46; color: #a7f3d0; padding: 1px 6px; font-family: var(--dp-typography-mono); font-size: 10px; font-weight: 700; margin-left: 6px;">[ SCORE: ${escapeHtml(String(slot1.relevance_score))}/100 ]</span>`
+      : '';
+    elements.slot1Desc.innerHTML = `<span style="color: var(--dp-color-ink);">${escapeHtml(slot1.title)}</span> ${s1ScoreBadge}<br><span style="color: var(--dp-color-ink-muted); font-size: 11px; font-family: var(--dp-typography-mono);">${escapeHtml(slot1.proposal_rationale || '')}</span>`;
   }
 
   const slot2 = (slots || []).find(s => s.slot_number === 2);
@@ -512,6 +561,18 @@ function renderInsights(analysis, slots) {
       <span style="color: var(--dp-color-ink-muted); font-size: 11px; font-family: var(--dp-typography-mono);">${escapeHtml(slot2.proposal_rationale || '')}</span>
       ${slot2.implementation_plan ? `<div style="margin-top: 6px; padding: 8px 12px; background: #241400; border: 1px solid var(--dp-color-accent); color: #fed7aa; font-size: 11px; font-family: var(--dp-typography-mono);"><strong>1-2 DAY PLAN:</strong> ${escapeHtml(slot2.implementation_plan)}</div>` : ''}
     `;
+  }
+
+  if (elements.qaReportBadge) {
+    const qa = analysis.qa_report;
+    if (qa && typeof qa.passed === 'boolean') {
+      const qaStatusBadge = qa.passed
+        ? '<span style="background: #065f46; color: #a7f3d0; padding: 1px 6px; font-family: var(--dp-typography-mono); font-size: 10px; font-weight: 700; margin-right: 6px;">[ PASS ]</span>'
+        : '<span style="background: #78350f; color: #fde68a; padding: 1px 6px; font-family: var(--dp-typography-mono); font-size: 10px; font-weight: 700; margin-right: 6px;">[ WARN ]</span>';
+      elements.qaReportBadge.innerHTML = `${qaStatusBadge}<span style="font-size: 11px; font-family: var(--dp-typography-mono); color: var(--dp-color-ink-muted);">${escapeHtml(qa.summary || '')}</span>`;
+    } else {
+      elements.qaReportBadge.textContent = '-';
+    }
   }
 }
 
