@@ -71,7 +71,7 @@ Requires Python 3.10+ (Python 3.12 verified).
    GEMINI_MODEL=gemini-2.5-flash
    GEMINI_REASONING_API_KEY=your_optional_reasoning_key
    GEMINI_REASONING_MODEL=gemini-2.5-pro
-   MASTER_RESUME_PATH=data/master/Manbir-OPS-Resume.md
+   MASTER_RESUME_PATH=data/master/Manbir-AI-Resume.md
    ```
 
 3. **Run the server (bound to localhost `127.0.0.1`):**
