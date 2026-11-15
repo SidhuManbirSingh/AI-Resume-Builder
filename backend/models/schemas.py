@@ -17,6 +17,60 @@ class ProjectMetadata(BaseModel):
     github_url: Optional[str] = None
     github_repo: Optional[str] = None
 
+class RequirementMatrixItem(BaseModel):
+    requirement: str
+    candidate_evidence: str
+    match_level: str  # "Strong", "Partial", "Gap"
+    provenance: str   # "possessed_by_candidate", "demonstrated_in_project", "required_by_employer", "not_verified"
+
+
+class ProjectScoreBreakdown(BaseModel):
+    project_id: str
+    title: str
+    technical_overlap: float
+    responsibility_alignment: float
+    domain_relevance: float
+    keyword_coverage: float
+    score: float
+    meets_threshold: bool = True
+
+
+class ATSScoreBreakdown(BaseModel):
+    overall_score: float
+    technical_overlap: float
+    responsibility_alignment: float
+    domain_relevance: float
+    keyword_coverage: float
+    formula: str = "0.40*T + 0.25*R + 0.20*D + 0.15*K"
+    matched_keywords: List[str] = Field(default_factory=list)
+    missing_keywords: List[str] = Field(default_factory=list)
+
+
+class QACheckItem(BaseModel):
+    name: str
+    passed: bool
+    severity: str = "info"  # "info", "warning", "error"
+    details: str
+
+
+class DocumentQAReport(BaseModel):
+    passed: bool
+    checks: List[QACheckItem] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    pdf_page_count: int = 1
+    summary: str = ""
+
+
+class PipelineTelemetry(BaseModel):
+    input_hash: str
+    prompt_version: str
+    schema_version: str
+    taxonomy_version: str
+    provider: str
+    stage_timings_ms: Dict[str, float] = Field(default_factory=dict)
+    warnings_count: int = 0
+
+
 class ProjectSlot(BaseModel):
     slot_number: int
     project_id: Optional[str] = None
@@ -27,11 +81,13 @@ class ProjectSlot(BaseModel):
     proposal_rationale: Optional[str] = None
     implementation_plan: Optional[str] = None
     github_url: Optional[str] = None
+    relevance_score: Optional[float] = None
+
 
 class Stage1AnalysisResult(BaseModel):
     target_role_title: str
     target_company: Optional[str] = None
-    role_family: str = "general"  # "facilities", "service_dispatch", "software_it", "security", "general"
+    role_family: str = "general"  # "facilities", "service_dispatch", "software_it", "operations_general", "security", "general"
     key_technical_requirements: List[str]
     key_responsibilities: List[str]
     slot1_project_id: str
@@ -42,6 +98,8 @@ class Stage1AnalysisResult(BaseModel):
     slot2_proposed_title: Optional[str] = None
     slot2_proposed_technologies: Optional[List[str]] = None
     slot2_proposed_plan: Optional[str] = None
+    requirement_matrix: List[RequirementMatrixItem] = Field(default_factory=list)
+    project_scores: List[ProjectScoreBreakdown] = Field(default_factory=list)
 
 class TunedExperience(BaseModel):
     company: str
@@ -80,6 +138,11 @@ class TailoredResumeResponse(BaseModel):
     analysis: Dict[str, Any]
     diffs: List[DiffItem] = Field(default_factory=list)
     slots: List[ProjectSlot] = Field(default_factory=list)
+    ats_score: Optional[ATSScoreBreakdown] = None
+    requirement_matrix: List[RequirementMatrixItem] = Field(default_factory=list)
+    qa_report: Optional[DocumentQAReport] = None
+    telemetry: Optional[PipelineTelemetry] = None
+    fact_registry_summary: Optional[Dict[str, Any]] = None
 
 class ExportRequest(BaseModel):
     markdown_content: str

@@ -8,13 +8,15 @@ from backend.models.schemas import (
     TunedExperience
 )
 from backend.llm.base import BaseLLMClient, _parse_and_structure_raw_jd
+from backend.services.fact_registry import CandidateFactRegistry
+from backend.services.scoring import DeterministicScorer
 
 
 class MockLLMClient(BaseLLMClient):
     """
     High-fidelity deterministic local engine for local development & offline testing.
-    Uses the Stage 0 Raw Job Posting Structurer to cleanly parse any copy-pasted job posting
-    and tailor the Profile Summary, Skills, and Experience bullets to the exact role family.
+    Uses the Stage 0 Raw Job Posting Structurer and DeterministicScorer (0.40T+0.25R+0.20D+0.15K)
+    to rank projects and tailor Profile Summary, Skills, and Experience bullets cleanly.
     """
     provider_name = "mock"
 
@@ -32,28 +34,22 @@ class MockLLMClient(BaseLLMClient):
         found_tech = structured["key_technical_requirements"]
         key_resp = structured["key_responsibilities"]
 
-        # Score and Rank Existing Projects with domain alignment
-        scored_projects = []
-        for p in projects:
-            score = 0
-            if role_family in ("facilities", "service_dispatch") and p.domain == "Facilities Operations":
-                score += 10
-            elif role_family == "software_it" and p.domain != "Facilities Operations":
-                score += 5
+        fact_registry = CandidateFactRegistry.build(master_parsed, projects=projects)
+        project_scores = DeterministicScorer.rank_projects(projects, structured, job_description)
+        requirement_matrix = DeterministicScorer.build_requirement_matrix(structured, fact_registry, projects)
 
-            for tech in p.technologies:
-                if tech.lower() in jd_lower:
-                    score += 3
-            if p.domain.lower() in jd_lower:
-                score += 2
-            for word in p.summary.lower().split():
-                if len(word) > 4 and word in jd_lower:
-                    score += 1
-            scored_projects.append((score, p))
-
-        scored_projects.sort(key=lambda x: x[0], reverse=True)
-        slot1_project = scored_projects[0][1] if scored_projects else None
+        projects_by_id = {p.id: p for p in projects}
+        top_breakdown = project_scores[0] if project_scores else None
+        slot1_project = projects_by_id.get(top_breakdown.project_id) if top_breakdown else None
         slot1_id = slot1_project.id if slot1_project else "gitlab_k8s_platform"
+        slot1_score_note = (
+            f"Deterministic relevance score: {top_breakdown.score}/100 "
+            f"(T={top_breakdown.technical_overlap}, R={top_breakdown.responsibility_alignment}, "
+            f"D={top_breakdown.domain_relevance}, K={top_breakdown.keyword_coverage})."
+            if top_breakdown else ""
+        )
+        if top_breakdown and not top_breakdown.meets_threshold:
+            slot1_score_note += " Note: Below minimum relevance threshold; selected closest portfolio match."
 
         # Determine Slot 2: Custom JD-Tailored Proposed Project (Under Development)
         proposed_proj = structured.get("proposed_project", {})
@@ -83,13 +79,18 @@ class MockLLMClient(BaseLLMClient):
             key_technical_requirements=found_tech[:6],
             key_responsibilities=key_resp,
             slot1_project_id=slot1_id,
-            slot1_rationale=f"Project '{slot1_project.title if slot1_project else slot1_id}' exhibits direct alignment with target stack: {', '.join(slot1_project.technologies if slot1_project else [])}.",
+            slot1_rationale=(
+                f"Project '{slot1_project.title if slot1_project else slot1_id}' exhibits direct alignment with target stack: "
+                f"{', '.join(slot1_project.technologies if slot1_project else [])}. {slot1_score_note}"
+            ).strip(),
             slot2_is_proposed=slot2_is_proposed,
             slot2_project_id=slot2_project_id,
             slot2_rationale=slot2_rationale,
             slot2_proposed_title=slot2_proposed_title,
             slot2_proposed_technologies=slot2_proposed_tech,
-            slot2_proposed_plan=slot2_proposed_plan
+            slot2_proposed_plan=slot2_proposed_plan,
+            requirement_matrix=requirement_matrix,
+            project_scores=project_scores,
         )
 
     def customize_sections(
@@ -211,6 +212,20 @@ class MockLLMClient(BaseLLMClient):
                 ]
             else:
                 tuned_bullets = []
+                if role_family == "facilities" and "GuardTeck" in comp_name:
+                    has_mech_rounds = any("chillers" in b.lower() for b in exp["bullets"])
+                    has_cmms = any("mri angus" in b.lower() for b in exp["bullets"])
+                    if not has_mech_rounds and not any("daily building rounds" in b.lower() for b in exp["bullets"]):
+                        tuned_bullets.append(
+                            "Conducted daily building rounds and mechanical room inspections across commercial properties, "
+                            "inspecting and logging operating parameters for chillers, cooling towers, AHUs, boilers, and pumps "
+                            "while monitoring building exteriors, envelopes, and grounds."
+                        )
+                    if not has_cmms:
+                        tuned_bullets.append(
+                            "Managed computerized work order dispatch and preventative maintenance logging utilizing enterprise "
+                            "CMMS workflows equivalent to MRI Angus and WPM Plus, coordinating HVAC, plumbing, electrical, and fire/life-safety trade contractors."
+                        )
                 for b in exp["bullets"]:
                     polished = b.strip()
                     if not polished or polished == ".":
@@ -239,16 +254,12 @@ class MockLLMClient(BaseLLMClient):
                 bullets=tuned_bullets
             ))
 
-        # Enforce reverse-chronological order
-        def exp_order(e: TunedExperience):
-            dr = e.date_range.lower()
-            if "2026" in dr:
-                return 0
-            elif "2023" in dr:
-                return 1
-            return 2
-
-        tuned_experiences.sort(key=exp_order)
+        # Enforce reverse-chronological order via deterministic date parsing
+        from backend.services.validator import ResumeValidator
+        tuned_experiences.sort(
+            key=lambda e: ResumeValidator._parse_date_sort_key(e.date_range),
+            reverse=True
+        )
 
         # 4. Build Projects: Slot 1
         p1 = projects_by_id.get(stage1_result.slot1_project_id, projects[0] if projects else None)
