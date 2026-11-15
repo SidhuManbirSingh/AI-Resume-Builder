@@ -637,12 +637,25 @@ City, BC | email@test.com | [LinkedIn](https://linkedin.com/in/test)
         self.assertGreaterEqual(summary["counts"]["project_catalog"], 5)
 
         self.assertEqual(registry.classify_skill_provenance("Python"), "possessed_by_candidate")
-        self.assertEqual(registry.classify_skill_provenance("YOLOv8"), "demonstrated_in_project")
         self.assertEqual(
-            registry.classify_skill_provenance("Terraform", jd_requirements=["Terraform"]),
+            registry.classify_skill_provenance("QuantumRustDB", jd_requirements=["QuantumRustDB"]),
             "required_by_employer",
         )
         self.assertEqual(registry.classify_skill_provenance("COBOL Mainframe"), "not_verified")
+
+        # Verify project-only skill classification deterministically regardless of master resume edits
+        controlled_master = {
+            "name": master_parsed.get("name", "Candidate"),
+            "contact_info": master_parsed.get("contact_info", {}),
+            "summary": "",
+            "skills": [{"category": "Core", "skills": ["Python"]}],
+            "experiences": [],
+            "education": "",
+            "certifications": "",
+        }
+        controlled_registry = CandidateFactRegistry.build(controlled_master, projects=projects)
+        self.assertEqual(controlled_registry.classify_skill_provenance("Python"), "possessed_by_candidate")
+        self.assertEqual(controlled_registry.classify_skill_provenance("YOLOv8"), "demonstrated_in_project")
 
     def test_semantic_validator_rejects_fabricated_metrics_and_certs(self):
         """Phase 1B: Verify ResumeValidator rejects unsupported metrics, certifications, and invented claims."""

@@ -221,5 +221,10 @@ class TestAPIEndpointsDirect(unittest.TestCase):
         self.assertIn("no-store", js_headers.get("cache-control", "").lower())
         self.assertIn("toolbarAtsScoreValue", js_body)
 
+        fav_status, fav_headers, fav_body = self._asgi_get("/favicon.ico")
+        self.assertEqual(fav_status, 200)
+        self.assertIn("image/svg+xml", fav_headers.get("content-type", ""))
+        self.assertIn("<svg", fav_body)
+
 if __name__ == "__main__":
     unittest.main()
