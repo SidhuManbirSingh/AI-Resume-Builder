@@ -1,10 +1,12 @@
 import hashlib
 import logging
 import time
+import requests
 from typing import Dict, Any, List
 from backend.core.security import sanitize_job_description, sanitize_additional_notes
 from backend.services.file_loader import FileLoaderService
 from backend.services.llm_client import get_llm_client
+from backend.llm.mock import MockLLMClient
 from backend.services.validator import ResumeValidator
 from backend.services.markdown_assembler import MarkdownAssembler
 from backend.services.fact_registry import CandidateFactRegistry
@@ -26,6 +28,20 @@ logger = logging.getLogger(__name__)
 
 
 class AIResumeOrchestrator:
+    @staticmethod
+    def _run_with_mock_fallback(llm, provider: str, stage_label: str, method_name: str, *args, **kwargs):
+        """Executes an LLM client stage, falling back to MockLLMClient on RuntimeError, Timeout, or ValueError."""
+        try:
+            return getattr(llm, method_name)(*args, **kwargs), llm, provider
+        except (RuntimeError, requests.exceptions.Timeout, ValueError) as exc:
+            logger.warning(
+                "LLM provider '%s' failed in %s (%s); falling back to MockLLMClient.",
+                provider, stage_label, exc,
+            )
+            fallback_llm = MockLLMClient()
+            fallback_provider = provider if provider.endswith("->mock_fallback") else f"{provider}->mock_fallback"
+            return getattr(fallback_llm, method_name)(*args, **kwargs), fallback_llm, fallback_provider
+
     @staticmethod
     def tailor_resume(raw_job_description: str, additional_notes: str = None) -> TailoredResumeResponse:
         """
@@ -62,7 +78,9 @@ class AIResumeOrchestrator:
 
         # Stage 1: Analyze JD & Select Projects
         t1 = time.perf_counter()
-        stage1_result = llm.analyze_and_select(clean_jd, master_parsed, projects)
+        stage1_result, llm, provider = AIResumeOrchestrator._run_with_mock_fallback(
+            llm, provider, "Stage 1", "analyze_and_select", clean_jd, master_parsed, projects
+        )
         stage_timings["stage1_ms"] = round((time.perf_counter() - t1) * 1000.0, 2)
 
         project_scores = stage1_result.project_scores or DeterministicScorer.rank_projects(
@@ -75,7 +93,9 @@ class AIResumeOrchestrator:
 
         # Stage 2: Targeted Resume Customization
         t2 = time.perf_counter()
-        stage2_result = llm.customize_sections(clean_jd, master_parsed, stage1_result, projects)
+        stage2_result, llm, provider = AIResumeOrchestrator._run_with_mock_fallback(
+            llm, provider, "Stage 2", "customize_sections", clean_jd, master_parsed, stage1_result, projects
+        )
         stage_timings["stage2_ms"] = round((time.perf_counter() - t2) * 1000.0, 2)
 
         # Stage 3: Structural Invariance & Semantic Claim Verification
@@ -215,10 +235,15 @@ class AIResumeOrchestrator:
             resume_ref = tailored_markdown.strip()
 
         llm = get_llm_client()
-        result = llm.generate_cover_letter(
+        provider = getattr(llm, "provider_name", "unknown")
+        result, _, _ = AIResumeOrchestrator._run_with_mock_fallback(
+            llm,
+            provider,
+            "Cover Letter",
+            "generate_cover_letter",
             job_description=clean_jd,
             resume_markdown=resume_ref,
-            additional_notes=clean_notes
+            additional_notes=clean_notes,
         )
 
         return CoverLetterResponse(
@@ -246,10 +271,15 @@ class AIResumeOrchestrator:
             resume_ref = tailored_markdown.strip()
 
         llm = get_llm_client()
-        result = llm.generate_outreach(
+        provider = getattr(llm, "provider_name", "unknown")
+        result, _, _ = AIResumeOrchestrator._run_with_mock_fallback(
+            llm,
+            provider,
+            "Outreach",
+            "generate_outreach",
             job_description=clean_jd,
             resume_markdown=resume_ref,
-            additional_notes=clean_notes
+            additional_notes=clean_notes,
         )
 
         return OutreachResponse(

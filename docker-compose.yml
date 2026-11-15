@@ -17,11 +17,14 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      - MASTER_RESUME_PATH=/app/data/master/Manbir-OPS-Resume.md
+      - MASTER_RESUME_PATH=/app/data/master/Manbir-AI-Resume.md
       - PROJECTS_DIR=/app/data/projects
       - OUTPUT_DIR=/app/data/output
       - STATIC_DIR=/app/frontend/static
     volumes:
+      # Live code and frontend static assets (read-only) so UI/backend updates take effect immediately
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
       # Mandatory Invariance Protection: Master Resume and Projects mounted READ-ONLY (:ro)
       - ./data/master:/app/data/master:ro
       - ./data/projects:/app/data/projects:ro

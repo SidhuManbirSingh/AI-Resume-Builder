@@ -392,17 +392,82 @@ body {
 }
 
 /* ==========================================================================
-   Action Toolbar (Downloads)
+   Action Toolbar (ATS Score HUD & Downloads)
    ========================================================================== */
 .toolbar-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 0.625rem 0.875rem;
   padding: 0.625rem 1rem;
   border-bottom: var(--dp-border-rule) solid var(--dp-color-rule);
   background-color: var(--dp-color-ground);
   width: 100%;
+}
+
+.toolbar-ats-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background-color: var(--dp-color-surface-elevated);
+  border: 1px solid var(--dp-color-rule);
+  min-height: 2.75rem;
+  flex: 1 1 100%;
+}
+
+.ats-hud-label {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dp-color-ink-muted);
+}
+
+.ats-hud-score {
+  font-family: var(--dp-typography-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dp-color-accent);
+  letter-spacing: 0.02em;
+}
+
+.ats-hud-breakdown {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.6875rem;
+  color: var(--dp-color-ink-muted);
+  letter-spacing: 0.03em;
+}
+
+.ats-hud-qa {
+  font-family: var(--dp-typography-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.125rem 0.45rem;
+  border: 1px solid var(--dp-color-rule);
+}
+
+.ats-hud-qa.pass {
+  background-color: #065f46;
+  color: #a7f3d0;
+  border-color: #10b981;
+}
+
+.ats-hud-qa.warn {
+  background-color: #78350f;
+  color: #fde68a;
+  border-color: #f59e0b;
+}
+
+.toolbar-export-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 100%;
 }
 
 .btn-download {
@@ -1005,6 +1070,15 @@ body {
    ========================================================================== */
 @media (min-width: 42em) {
   .toolbar-actions {
+    justify-content: space-between;
+  }
+
+  .toolbar-ats-hud {
+    flex: 1 1 auto;
+  }
+
+  .toolbar-export-group {
+    flex: 0 0 auto;
     justify-content: flex-end;
   }
 
@@ -1052,7 +1126,7 @@ body {
   }
 
   .kinetic-textarea {
-    min-height: 25rem;
+    min-height: 15rem;
   }
 
   .markdown-editor-area {

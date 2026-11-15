@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RESUME TAILOR</title>
   <!-- Kinetic Design System Stylesheet (Standalone, decoupled from logic) -->
-  <link rel="stylesheet" href="/static/css/kinetic.css">
+  <link rel="stylesheet" href="/static/css/kinetic.css?v=2.1.0">
 </head>
 <body>
 
@@ -139,16 +139,24 @@
         </button>
       </div>
 
-      <!-- Action Toolbar (Downloads) -->
+      <!-- Action Toolbar (ATS Score HUD & Downloads) -->
       <div class="toolbar-actions">
-        <button id="downloadMarkdownBtn" class="btn-download">
-          <span>EXPORT .MD</span>
-          <span>&darr;</span>
-        </button>
-        <button id="downloadPdfBtn" class="btn-download accent">
-          <span>DOWNLOAD ATS PDF</span>
-          <span>&darr;</span>
-        </button>
+        <div id="toolbarAtsHud" class="toolbar-ats-hud" title="Deterministic ATS Score = 0.40*Tech + 0.25*Resp + 0.20*Domain + 0.15*Keywords">
+          <span class="ats-hud-label">ATS MATCH SCORE</span>
+          <span id="toolbarAtsScoreValue" class="ats-hud-score">-- / 100</span>
+          <span id="toolbarAtsBreakdown" class="ats-hud-breakdown">[ RUN TAILOR RESUME ]</span>
+          <span id="toolbarQaBadge" class="ats-hud-qa hidden"></span>
+        </div>
+        <div class="toolbar-export-group">
+          <button id="downloadMarkdownBtn" class="btn-download">
+            <span>EXPORT .MD</span>
+            <span>&darr;</span>
+          </button>
+          <button id="downloadPdfBtn" class="btn-download accent">
+            <span>DOWNLOAD ATS PDF</span>
+            <span>&darr;</span>
+          </button>
+        </div>
       </div>
 
       <!-- Kinetic Loading State -->
@@ -279,6 +287,6 @@
   </footer>
 
   <!-- Decoupled JavaScript Logic -->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=2.1.0"></script>
 </body>
 </html>

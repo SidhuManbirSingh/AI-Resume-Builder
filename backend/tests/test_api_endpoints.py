@@ -4,11 +4,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+import asyncio
 import unittest
 from unittest.mock import patch
 import requests
 from fastapi import HTTPException
 from backend.main import (
+    app,
     health_check,
     get_master_resume,
     get_projects,
@@ -166,6 +168,58 @@ class TestAPIEndpointsDirect(unittest.TestCase):
             detail = str(ctx.exception.detail)
             self.assertNotIn("AIza", detail)
             self.assertNotIn("key=", detail)
+
+    def _asgi_get(self, path: str):
+        async def _call():
+            scope = {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "http",
+                "path": path,
+                "raw_path": path.encode("ascii"),
+                "query_string": b"",
+                "headers": [],
+                "client": ("127.0.0.1", 12345),
+                "server": ("127.0.0.1", 8000),
+            }
+            status_code = None
+            headers = {}
+            body_chunks = []
+
+            async def receive():
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            async def send(message):
+                nonlocal status_code
+                if message["type"] == "http.response.start":
+                    status_code = message["status"]
+                    headers.update({
+                        k.decode("latin-1").lower(): v.decode("latin-1")
+                        for k, v in message.get("headers", [])
+                    })
+                elif message["type"] == "http.response.body":
+                    body_chunks.append(message.get("body", b""))
+
+            await app(scope, receive, send)
+            return status_code, headers, b"".join(body_chunks).decode("utf-8", errors="replace")
+
+        return asyncio.run(_call())
+
+    def test_frontend_index_contains_ats_score_hud(self):
+        status_code, headers, html = self._asgi_get("/")
+        self.assertEqual(status_code, 200)
+        self.assertIn("no-store", headers.get("cache-control", "").lower())
+        self.assertIn("toolbarAtsHud", html)
+        self.assertIn("toolbarAtsScoreValue", html)
+        self.assertIn("atsScoreBadge", html)
+        self.assertIn("/static/js/app.js?v=2.1.0", html)
+
+        js_status, js_headers, js_body = self._asgi_get("/static/js/app.js")
+        self.assertEqual(js_status, 200)
+        self.assertIn("no-store", js_headers.get("cache-control", "").lower())
+        self.assertIn("toolbarAtsScoreValue", js_body)
 
 if __name__ == "__main__":
     unittest.main()

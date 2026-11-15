@@ -116,6 +116,10 @@ function initElements() {
   // Processing & Insights
   elements.processingIndicator = document.getElementById('processingIndicator');
   elements.processingStepText = document.getElementById('processingStepText');
+  elements.toolbarAtsHud = document.getElementById('toolbarAtsHud');
+  elements.toolbarAtsScoreValue = document.getElementById('toolbarAtsScoreValue');
+  elements.toolbarAtsBreakdown = document.getElementById('toolbarAtsBreakdown');
+  elements.toolbarQaBadge = document.getElementById('toolbarQaBadge');
   elements.analysisCard = document.getElementById('analysisCard');
   elements.atsScoreBadge = document.getElementById('atsScoreBadge');
   elements.targetRoleBadge = document.getElementById('targetRoleBadge');
@@ -483,20 +487,35 @@ function renderDiffs(diffs) {
 }
 
 function renderInsights(analysis, slots) {
-  if (!analysis || !elements.analysisCard) return;
+  if (!analysis) return;
 
-  elements.analysisCard.classList.remove('hidden');
+  if (elements.analysisCard) {
+    elements.analysisCard.classList.remove('hidden');
+  }
+
+  const ats = analysis.ats_score;
+  const hasAtsScore = Boolean(ats && typeof ats.overall_score === 'number');
+  const scoreColor = hasAtsScore
+    ? (ats.overall_score >= 75 ? '#22c55e' : (ats.overall_score >= 50 ? 'var(--dp-color-accent)' : '#ef4444'))
+    : 'var(--dp-color-ink-muted)';
+  const breakdownText = hasAtsScore
+    ? `T: ${ats.technical_overlap}% | R: ${ats.responsibility_alignment}% | D: ${ats.domain_relevance}% | K: ${ats.keyword_coverage}%`
+    : '[ N/A ]';
+
+  if (elements.toolbarAtsScoreValue) {
+    elements.toolbarAtsScoreValue.textContent = hasAtsScore ? `${ats.overall_score} / 100` : '-- / 100';
+    elements.toolbarAtsScoreValue.style.color = scoreColor;
+  }
+  if (elements.toolbarAtsBreakdown) {
+    elements.toolbarAtsBreakdown.textContent = breakdownText;
+  }
 
   if (elements.atsScoreBadge) {
-    const ats = analysis.ats_score;
-    if (ats && typeof ats.overall_score === 'number') {
-      const scoreColor = ats.overall_score >= 75 ? '#22c55e' : (ats.overall_score >= 50 ? 'var(--dp-color-accent)' : '#ef4444');
+    if (hasAtsScore) {
       elements.atsScoreBadge.innerHTML = `
         <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
           <span style="font-size: 20px; font-weight: 700; color: ${scoreColor}; font-family: var(--dp-typography-mono);">${escapeHtml(String(ats.overall_score))} / 100</span>
-          <span style="font-size: 11px; color: var(--dp-color-ink-muted); font-family: var(--dp-typography-mono);">
-            T: ${escapeHtml(String(ats.technical_overlap))}% | R: ${escapeHtml(String(ats.responsibility_alignment))}% | D: ${escapeHtml(String(ats.domain_relevance))}% | K: ${escapeHtml(String(ats.keyword_coverage))}%
-          </span>
+          <span style="font-size: 11px; color: var(--dp-color-ink-muted); font-family: var(--dp-typography-mono);">${escapeHtml(breakdownText)}</span>
         </div>
       `;
     } else {
@@ -563,9 +582,24 @@ function renderInsights(analysis, slots) {
     `;
   }
 
+  const qa = analysis.qa_report;
+  const hasQa = Boolean(qa && typeof qa.passed === 'boolean');
+
+  if (elements.toolbarQaBadge) {
+    elements.toolbarQaBadge.classList.remove('pass', 'warn');
+    if (hasQa) {
+      elements.toolbarQaBadge.classList.remove('hidden');
+      elements.toolbarQaBadge.classList.add(qa.passed ? 'pass' : 'warn');
+      elements.toolbarQaBadge.textContent = qa.passed ? 'QA: PASS' : 'QA: WARN';
+      elements.toolbarQaBadge.title = qa.summary || '';
+    } else {
+      elements.toolbarQaBadge.classList.add('hidden');
+      elements.toolbarQaBadge.textContent = '';
+    }
+  }
+
   if (elements.qaReportBadge) {
-    const qa = analysis.qa_report;
-    if (qa && typeof qa.passed === 'boolean') {
+    if (hasQa) {
       const qaStatusBadge = qa.passed
         ? '<span style="background: #065f46; color: #a7f3d0; padding: 1px 6px; font-family: var(--dp-typography-mono); font-size: 10px; font-weight: 700; margin-right: 6px;">[ PASS ]</span>'
         : '<span style="background: #78350f; color: #fde68a; padding: 1px 6px; font-family: var(--dp-typography-mono); font-size: 10px; font-weight: 700; margin-right: 6px;">[ WARN ]</span>';

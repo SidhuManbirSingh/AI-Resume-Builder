@@ -6,6 +6,7 @@ if str(ROOT_DIR) not in sys.path:
 
 import unittest
 import json
+import requests
 from unittest.mock import patch, MagicMock
 from backend.services.file_loader import FileLoaderService, MasterResumeParser
 from backend.core.security import strip_github_links, sanitize_job_description, sanitize_filename
@@ -843,6 +844,30 @@ City, BC | email@test.com | [LinkedIn](https://linkedin.com/in/test)
         self.assertFalse(by_name["github_and_urls"].passed)
         self.assertFalse(by_name["spacing_and_page_breaks"].passed)
         self.assertFalse(by_name["keyword_repetition"].passed)
+
+    def test_gemini_read_timeout_falls_back_and_computes_ats_score(self):
+        """Verify Gemini ReadTimeout retries, falls back cleanly to MockLLMClient, and returns ATS score."""
+        jd = (
+            "Commercial Facilities Operations Coordinator\n"
+            "Inspect mechanical rooms (chillers, boilers, AHUs), BAS/BMS controls, and MRI Angus work orders."
+        )
+        with (
+            patch.object(settings, "LLM_PROVIDER", "gemini"),
+            patch.object(settings, "GEMINI_API_KEY", "AIzaTestTimeoutKey"),
+            patch.object(settings, "GEMINI_REASONING_API_KEY", ""),
+            patch.object(settings, "GEMINI_MODEL", "gemini-2.5-flash"),
+            patch("backend.llm.gemini.time.sleep", return_value=None),
+            patch(
+                "backend.llm.gemini.requests.post",
+                side_effect=requests.exceptions.ReadTimeout("Read timed out"),
+            ) as mock_post,
+        ):
+            res = AIResumeOrchestrator.tailor_resume(jd)
+            self.assertEqual(mock_post.call_count, 6)
+            self.assertIn("ats_score", res.analysis)
+            self.assertGreater(res.analysis["ats_score"]["overall_score"], 0)
+            self.assertGreater(res.ats_score.overall_score, 0)
+            self.assertEqual(res.telemetry.provider, "gemini->mock_fallback")
 
 if __name__ == "__main__":
     unittest.main()

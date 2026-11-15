@@ -45,9 +45,9 @@ class GeminiLLMClient(BaseLLMClient):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-4-hydrogen",
         reasoning_api_key: Optional[str] = None,
-        reasoning_model: str = "gemini-2.5-pro",
+        reasoning_model: str = "gemini-3.1-pro",
         max_retries: int = 3,
         base_backoff: float = 0.5
     ):
@@ -86,6 +86,8 @@ class GeminiLLMClient(BaseLLMClient):
             gen_config["responseSchema"] = response_schema
         if thinking_budget is not None:
             gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
+        elif "2.5-flash" in model_name:
+            gen_config["thinkingConfig"] = {"thinkingBudget": 0}
 
         payload = {
             "system_instruction": {
@@ -101,8 +103,22 @@ class GeminiLLMClient(BaseLLMClient):
         }
 
         last_response = None
+        last_timeout_exc: Optional[Exception] = None
         for attempt in range(self.max_retries):
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=(10, 25))
+            except requests.exceptions.Timeout as exc:
+                last_timeout_exc = exc
+                if attempt < self.max_retries - 1:
+                    sleep_seconds = self.base_backoff * (2 ** attempt)
+                    logger.warning(
+                        "Gemini API timed out on %s (attempt %d/%d); retrying in %.2fs",
+                        model_name, attempt + 1, self.max_retries, sleep_seconds,
+                    )
+                    time.sleep(sleep_seconds)
+                    continue
+                raise RuntimeError(f"Gemini API timeout on {model_name}: {exc}") from exc
+
             last_response = response
             if response.status_code in (429, 503) and attempt < self.max_retries - 1:
                 sleep_seconds = self.base_backoff * (2 ** attempt)
@@ -113,6 +129,9 @@ class GeminiLLMClient(BaseLLMClient):
                 time.sleep(sleep_seconds)
                 continue
             break
+
+        if last_response is None:
+            raise RuntimeError(f"Gemini API timeout on {model_name}: {last_timeout_exc}")
 
         if last_response.status_code != 200:
             raise RuntimeError(f"Gemini API Error ({last_response.status_code}) on {model_name}: {last_response.text}")
@@ -136,7 +155,7 @@ class GeminiLLMClient(BaseLLMClient):
         user_prompt: str,
         response_schema: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Calls the primary fast model (gemini-2.5-flash), trying reasoning_api_key if primary fails with HTTP error."""
+        """Calls primary model (gemini-2.5-flash), trying reasoning_api_key and fallback 'gemini-2.0-flash' on RuntimeError."""
         try:
             return self._call_gemini_endpoint(
                 system_instruction,
@@ -147,12 +166,27 @@ class GeminiLLMClient(BaseLLMClient):
             )
         except RuntimeError as primary_err:
             if self.reasoning_api_key and self.reasoning_api_key != self.api_key:
+                try:
+                    return self._call_gemini_endpoint(
+                        system_instruction,
+                        user_prompt,
+                        self.reasoning_api_key,
+                        self.model,
+                        response_schema=response_schema
+                    )
+                except RuntimeError:
+                    pass
+            if self.model != "gemini-2.0-flash":
+                logger.warning(
+                    "Primary model '%s' failed (%s); falling back to 'gemini-2.0-flash'.",
+                    self.model, primary_err,
+                )
                 return self._call_gemini_endpoint(
                     system_instruction,
                     user_prompt,
-                    self.reasoning_api_key,
-                    self.model,
-                    response_schema=response_schema
+                    self.api_key,
+                    "gemini-2.0-flash",
+                    response_schema=response_schema,
                 )
             raise primary_err
 

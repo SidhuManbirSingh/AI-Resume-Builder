@@ -47,6 +47,21 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+}
+
+
+@app.middleware("http")
+async def disable_static_cache(request: Request, call_next):
+    """Prevent browser caching of the SPA HTML shell and static CSS/JS assets."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static"):
+        for header, value in NO_CACHE_HEADERS.items():
+            response.headers[header] = value
+    return response
+
 @app.on_event("startup")
 def startup_github_sync():
     """
@@ -238,8 +253,11 @@ if static_path.exists():
     def serve_frontend():
         index_file = static_path / "index.html"
         if index_file.exists():
-            return FileResponse(str(index_file))
-        return HTMLResponse("<h1>AI Resume Tailor Backend API Running</h1><p>Frontend static files not found.</p>")
+            return FileResponse(str(index_file), headers=NO_CACHE_HEADERS)
+        return HTMLResponse(
+            "<h1>AI Resume Tailor Backend API Running</h1><p>Frontend static files not found.</p>",
+            headers=NO_CACHE_HEADERS,
+        )
 
 if __name__ == "__main__":
     import uvicorn
