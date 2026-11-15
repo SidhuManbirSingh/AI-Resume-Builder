@@ -31,7 +31,7 @@ def sanitize_job_description(raw_text: str) -> str:
     
     # Neutralize injection delimiters (case-insensitive regex across all XML prompt tags)
     cleaned = re.sub(
-        r'</?\s*(?:job_description|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog)\s*>',
+        r'</?\s*(?:job_description|untrusted_job_description|untrusted_user_notes|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog|requirement_matrix)\s*>',
         '',
         cleaned,
         flags=re.IGNORECASE
@@ -48,7 +48,7 @@ def sanitize_additional_notes(notes: str) -> str:
         return ""
     cleaned = notes.replace("\x00", "").strip()[:2000]
     cleaned = re.sub(
-        r'</?\s*(?:job_description|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog)\s*>',
+        r'</?\s*(?:job_description|untrusted_job_description|untrusted_user_notes|raw_job_posting|stage0_structured_brief|stage0_blueprint|resume|candidate_profile|project_catalog|requirement_matrix)\s*>',
         '',
         cleaned,
         flags=re.IGNORECASE

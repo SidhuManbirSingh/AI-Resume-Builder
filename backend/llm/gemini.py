@@ -2,7 +2,8 @@ import json
 import time
 import logging
 import requests
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Type, TypeVar
+from pydantic import BaseModel, ValidationError
 from backend.models.schemas import (
     ProjectMetadata,
     Stage1AnalysisResult,
@@ -22,8 +23,11 @@ from backend.llm.prompts import (
     _build_cover_letter_prompts,
     _build_outreach_prompts
 )
+from backend.services.fact_registry import CandidateFactRegistry
+from backend.services.scoring import DeterministicScorer
 
 logger = logging.getLogger(__name__)
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 class GeminiLLMClient(BaseLLMClient):
@@ -32,9 +36,11 @@ class GeminiLLMClient(BaseLLMClient):
     - Passes API key exclusively via 'x-goog-api-key' HTTP header (never in URL query params).
     - Enforces structural output via 'responseSchema' in 'generationConfig'.
     - Retries transient HTTP 429 and 503 responses with exponential backoff.
+    - Bounded schema validation retry loop (MAX_SCHEMA_RETRIES = 2) on malformed JSON/schema responses.
     - Supports optional Stage 0 high-reasoning JD structurer key/model.
     """
     provider_name = "gemini"
+    MAX_SCHEMA_RETRIES = 2
 
     def __init__(
         self,
@@ -162,6 +168,40 @@ class GeminiLLMClient(BaseLLMClient):
         self._stage0_cache[cache_key] = base_structured
         return base_structured
 
+    def _call_with_schema_retry(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        response_schema: Dict[str, Any],
+        model_cls: Type[TModel],
+    ) -> TModel:
+        """
+        Calls Gemini with bounded schema retries if JSON extraction or Pydantic validation fails.
+        """
+        current_prompt = user_prompt
+        last_err: Optional[Exception] = None
+        for attempt in range(self.MAX_SCHEMA_RETRIES + 1):
+            raw_response = self._call_gemini(system_prompt, current_prompt, response_schema=response_schema)
+            try:
+                json_clean = _extract_json(raw_response)
+                parsed = json.loads(json_clean)
+                return model_cls.model_validate(parsed)
+            except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+                last_err = exc
+                logger.warning(
+                    "Schema validation attempt %d/%d failed for %s: %s",
+                    attempt + 1,
+                    self.MAX_SCHEMA_RETRIES + 1,
+                    model_cls.__name__,
+                    exc,
+                )
+                current_prompt = (
+                    f"{user_prompt}\n\n"
+                    f"CORRECTION REQUIRED: Previous output failed JSON/schema validation ({exc}). "
+                    "Return ONLY strictly valid raw JSON matching the exact schema."
+                )
+        raise ValueError(f"Failed schema validation for {model_cls.__name__} after retries: {last_err}")
+
     def analyze_and_select(
         self,
         job_description: str,
@@ -169,10 +209,30 @@ class GeminiLLMClient(BaseLLMClient):
         projects: List[ProjectMetadata]
     ) -> Stage1AnalysisResult:
         structured = self.structure_raw_job_description(job_description, master_parsed)
-        system_prompt, user_prompt = _build_stage1_prompts(job_description, master_parsed, projects, structured)
-        raw_response = self._call_gemini(system_prompt, user_prompt, response_schema=STAGE1_RESPONSE_SCHEMA)
-        json_clean = _extract_json(raw_response)
-        result = Stage1AnalysisResult.model_validate(json.loads(json_clean))
+        fact_registry = CandidateFactRegistry.build(master_parsed, projects=projects)
+        project_scores = DeterministicScorer.rank_projects(projects, structured, job_description)
+        requirement_matrix = DeterministicScorer.build_requirement_matrix(structured, fact_registry, projects)
+
+        system_prompt, user_prompt = _build_stage1_prompts(
+            job_description,
+            master_parsed,
+            projects,
+            structured=structured,
+            project_scores=project_scores,
+        )
+        result = self._call_with_schema_retry(
+            system_prompt, user_prompt, STAGE1_RESPONSE_SCHEMA, Stage1AnalysisResult
+        )
+        valid_ids = {p.id for p in projects}
+        if result.slot1_project_id not in valid_ids and project_scores:
+            logger.warning(
+                "Stage 1 returned unknown project id '%s'; falling back to top scored '%s'.",
+                result.slot1_project_id,
+                project_scores[0].project_id,
+            )
+            result.slot1_project_id = project_scores[0].project_id
+        result.project_scores = project_scores
+        result.requirement_matrix = requirement_matrix
         if len(result.target_role_title) > 65 or "\n" in result.target_role_title:
             result.target_role_title = _clean_extracted_title(structured["clean_role_title"])
         if not result.target_company and structured.get("target_company"):
@@ -190,10 +250,9 @@ class GeminiLLMClient(BaseLLMClient):
         system_prompt, user_prompt = _build_stage2_prompts(
             job_description, master_parsed, stage1_result, projects, structured
         )
-        raw_response = self._call_gemini(system_prompt, user_prompt, response_schema=STAGE2_RESPONSE_SCHEMA)
-        json_clean = _extract_json(raw_response)
-        data = json.loads(json_clean)
-        return Stage2CustomizationResult.model_validate(data)
+        return self._call_with_schema_retry(
+            system_prompt, user_prompt, STAGE2_RESPONSE_SCHEMA, Stage2CustomizationResult
+        )
 
     def generate_cover_letter(
         self,
