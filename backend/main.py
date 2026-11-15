@@ -73,7 +73,7 @@ def health_check():
     """
     Status endpoint verifying system configuration, active LLM provider, and file availability.
     """
-    master_exists = settings.MASTER_RESUME_PATH.exists()
+    master_exists = FileLoaderService.resolve_master_resume_path() is not None
     projects = FileLoaderService.get_project_catalog()
     llm_client = get_llm_client()
     active_provider = getattr(llm_client, "provider_name", settings.LLM_PROVIDER)

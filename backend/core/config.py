@@ -34,6 +34,23 @@ def _resolve_path(env_val: Optional[str], default_path: Path) -> Path:
         return (BASE_DIR / p).resolve()
     return p.resolve()
 
+def _resolve_master_resume_path(env_val: Optional[str]) -> Path:
+    candidate = _resolve_path(env_val, BASE_DIR / "data" / "master" / "Manbir-AI-Resume.md")
+    if candidate.exists():
+        return candidate
+    master_dir = _resolve_path(os.getenv("DATA_DIR"), BASE_DIR / "data") / "master"
+    if master_dir.exists():
+        manbir_files = sorted(master_dir.glob("Manbir-*.md"))
+        if manbir_files:
+            return manbir_files[0].resolve()
+        md_files = sorted(p for p in master_dir.glob("*.md") if p.name != "master_resume.md")
+        if md_files:
+            return md_files[0].resolve()
+        fallback = master_dir / "master_resume.md"
+        if fallback.exists():
+            return fallback.resolve()
+    return candidate
+
 _load_env_file(BASE_DIR / ".env")
 
 class Settings:
@@ -43,7 +60,7 @@ class Settings:
     # Paths (Always anchored to BASE_DIR if relative)
     BASE_DIR: Path = BASE_DIR
     DATA_DIR: Path = _resolve_path(os.getenv("DATA_DIR"), BASE_DIR / "data")
-    MASTER_RESUME_PATH: Path = _resolve_path(os.getenv("MASTER_RESUME_PATH"), BASE_DIR / "data" / "master" / "master_resume.md")
+    MASTER_RESUME_PATH: Path = _resolve_master_resume_path(os.getenv("MASTER_RESUME_PATH"))
     PROJECTS_DIR: Path = _resolve_path(os.getenv("PROJECTS_DIR"), BASE_DIR / "data" / "projects")
     OUTPUT_DIR: Path = _resolve_path(os.getenv("OUTPUT_DIR"), BASE_DIR / "data" / "output")
     STATIC_DIR: Path = _resolve_path(os.getenv("STATIC_DIR"), BASE_DIR / "frontend" / "static")

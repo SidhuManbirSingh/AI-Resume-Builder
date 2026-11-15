@@ -3,7 +3,7 @@ import os
 import re
 import yaml
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from fastapi import HTTPException
 from backend.core.config import settings
 from backend.models.schemas import ProjectMetadata
@@ -40,12 +40,21 @@ class MasterResumeParser:
         }
 
     @staticmethod
+    def _is_date_text(text: str) -> bool:
+        return bool(re.search(
+            r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|present|current|\d{4})\b',
+            text,
+            re.I
+        ))
+
+    @staticmethod
     def parse(markdown_text: str) -> Dict[str, Any]:
         """
         Parses master resume markdown into structured sections.
-        Works robustly with various heading styles (##, ###, **HEADING**, etc.)
+        Works robustly with various heading styles (##, ###, **HEADING**, inline bold jobs, etc.)
         """
-        lines = markdown_text.splitlines()
+        cleaned_markdown = re.sub(r'</?(?:u|sup|sub)>', '', markdown_text)
+        lines = cleaned_markdown.splitlines()
         data: Dict[str, Any] = {
             "name": "",
             "contact": "",
@@ -79,10 +88,22 @@ class MasterResumeParser:
             if first_line:
                 data["name"] = first_line
 
+        # Normalize contact header links so clickable LinkedIn & GitHub URLs exist in generated outputs
+        if data["contact"] and "manbir" in data["name"].lower():
+            if "linkedin" in data["contact"].lower() and "linkedin.com" not in data["contact"].lower():
+                data["contact"] = re.sub(
+                    r'\bLinkedIn\b',
+                    '[LinkedIn](https://www.linkedin.com/in/manbir-singh-sidhu/)',
+                    data["contact"],
+                    flags=re.I
+                )
+            if "github" not in data["contact"].lower():
+                data["contact"] = f"{data['contact']} | [GitHub](https://github.com/SidhuManbirSingh/SidhuManbirSingh/)"
+
         data["contact_info"] = MasterResumeParser._parse_contact_metadata(data["name"], data["contact"])
 
         # 2. Normalize bold section headers like **PROFESSIONAL EXPERIENCE** to ## PROFESSIONAL EXPERIENCE
-        text_norm = re.sub(r'(?m)^\s*\*\*([A-Z\s,&/]+)\*\*\s*$', r'## \1', markdown_text)
+        text_norm = re.sub(r'(?m)^\s*\*\*([A-Z\s,&/]+)\*\*\s*$', r'## \1', cleaned_markdown)
         raw_sections = re.split(r'(?m)^##\s+', text_norm)
 
         in_experience_section = False
@@ -95,7 +116,11 @@ class MasterResumeParser:
             h = sec_lines[0].replace("**", "").strip()
             if h.startswith("#"):
                 continue
-            body = "\n".join(sec_lines[1:]).strip()
+            body_lines = [
+                l for l in sec_lines[1:]
+                if not re.match(r'^\s*[_*]?references available upon request[_*]?\s*$', l.strip(), re.I)
+            ]
+            body = "\n".join(body_lines).strip()
             h_lower = h.lower().strip()
 
             if h_lower in ("professional summary", "summary", "profile", "executive summary"):
@@ -104,13 +129,16 @@ class MasterResumeParser:
             elif re.match(r'^(certifications?|licenses?|certifications?\s*&\s*licenses?)$', h_lower):
                 data["certifications"] = body
                 in_experience_section = False
-            elif re.match(r'^(core competencies|technical skills|skills|technical skills\s*&\s*building systems)$', h_lower):
+            elif re.match(r'^(core competencies|technical skills(?:\s*&\s*[a-z0-9\s/]+)?|skills|key skills)$', h_lower):
                 skills_raw_parts.append(body)
                 in_experience_section = False
-                cat_matches = re.findall(r'(?:^|\n)(?:-\s*)?\*\*([^\*:]+):?\*\*\s*:?\s*(.+)', body)
+                cat_matches = re.findall(
+                    r'(?:^|\n|\s)(?:-\s*)?\*\*([^\*\n:]+?):?\*\*\s*:?\s*(.+?)(?=(?:\s+\*\*[^\*\n:]+?:?\*\*)|\n|$)',
+                    body
+                )
                 if cat_matches:
                     for cat, items in cat_matches:
-                        clean_skills = [x.strip() for x in re.split(r',\s*(?![^()]*\))', items) if x.strip()]
+                        clean_skills = [x.strip() for x in re.split(r',\s*(?![^()]*\))', items.strip().rstrip(",")) if x.strip()]
                         data["skills"].append({
                             "category": MasterResumeParser._normalize_category_name(cat),
                             "skills": clean_skills
@@ -134,15 +162,17 @@ class MasterResumeParser:
             elif re.match(r'^(projects|relevant projects|relevant operations projects|technical projects|key projects)$', h_lower):
                 data["projects_raw"] = body
                 in_experience_section = False
-            elif re.match(r'^(professional experience|experience|employment history|work history)$', h_lower):
+            elif re.match(r'^(professional experience|work experience|experience|employment history|work history|relevant experience)$', h_lower):
                 in_experience_section = True
                 data["experiences_raw"] = body
                 if "###" in body:
                     # Parse jobs inside the experience body (Alex Morgan style)
                     data["experiences"].extend(MasterResumeParser._parse_nested_experiences(body))
+                elif re.search(r'(?m)^\s*\*\*[^\*]+\*\*', body):
+                    data["experiences"].extend(MasterResumeParser._parse_inline_experiences(body))
             elif in_experience_section:
                 # Individual job header under experience (Manbir style)
-                b_lines = [l.strip() for l in sec_lines[1:] if l.strip()]
+                b_lines = [l.strip() for l in body_lines if l.strip()]
                 company = ""
                 date_range = ""
                 location = ""
@@ -173,6 +203,71 @@ class MasterResumeParser:
 
         data["skills_raw"] = "\n\n".join(skills_raw_parts)
         return data
+
+    @staticmethod
+    def _parse_inline_experiences(exp_text: str) -> List[Dict[str, Any]]:
+        """
+        Parses inline bold job headers (e.g. '**Full-Stack Web Developer** _May 2025 - Jun 2025_')
+        within an experience section body.
+        """
+        jobs: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+        header_re = re.compile(r'^\*\*([^\*]+)\*\*\s*(?:[_*]([^_*]+)[_*])?\s*$')
+
+        for raw_line in exp_text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            hm = header_re.match(line)
+            if hm:
+                if current:
+                    if not current["company"]:
+                        current["company"] = "Organization"
+                    jobs.append(current)
+                raw_title = hm.group(1).strip()
+                date_inline = (hm.group(2) or "").strip()
+                company = ""
+                if "|" in raw_title:
+                    parts = [p.strip() for p in raw_title.split("|", 1)]
+                    raw_title, company = parts[0], parts[1]
+                current = {
+                    "title": raw_title or "Professional Role",
+                    "company": company,
+                    "date_range": date_inline,
+                    "location": "",
+                    "bullets": [],
+                }
+                continue
+            if current is None:
+                continue
+            if (line.startswith("_") and line.endswith("_")) or (
+                line.startswith("*") and line.endswith("*") and not line.startswith("**")
+            ):
+                cleaned = line.strip("_*").strip()
+                if "|" in cleaned:
+                    parts = [p.strip() for p in cleaned.split("|", 1)]
+                    if not current["date_range"] and MasterResumeParser._is_date_text(parts[0]):
+                        current["date_range"] = parts[0]
+                        current["location"] = parts[1]
+                    else:
+                        if not current["company"]:
+                            current["company"] = parts[0]
+                        if len(parts) > 1 and not current["location"]:
+                            current["location"] = parts[1]
+                elif not current["date_range"] and MasterResumeParser._is_date_text(cleaned):
+                    current["date_range"] = cleaned
+                elif not current["company"]:
+                    current["company"] = cleaned
+            elif line.startswith(("-", "*")):
+                bullet = re.sub(r'^[-*]\s*', '', line).strip()
+                if bullet:
+                    current["bullets"].append(bullet)
+
+        if current:
+            if not current["company"]:
+                current["company"] = "Organization"
+            jobs.append(current)
+        return jobs
 
     @staticmethod
     def _parse_nested_experiences(exp_text: str) -> List[Dict[str, Any]]:
@@ -220,22 +315,36 @@ class MasterResumeParser:
 
 class FileLoaderService:
     @staticmethod
+    def resolve_master_resume_path() -> Optional[Path]:
+        """
+        Resolves the active master resume markdown path with deterministic fallback
+        inside data/master/.
+        """
+        path = settings.MASTER_RESUME_PATH
+        if path.exists():
+            return path
+        master_dir = settings.DATA_DIR / "master"
+        if master_dir.exists():
+            manbir_files = sorted(master_dir.glob("Manbir-*.md"))
+            if manbir_files:
+                return manbir_files[0]
+            md_files = sorted(p for p in master_dir.glob("*.md") if p.name != "master_resume.md")
+            if md_files:
+                return md_files[0]
+            fallback = master_dir / "master_resume.md"
+            if fallback.exists():
+                return fallback
+        return None
+
+    @staticmethod
     def get_master_resume() -> Tuple[str, Dict[str, Any]]:
         """
         Reads master resume strictly read-only.
         Auto-detects active master resume file in data/master.
         """
-        path = settings.MASTER_RESUME_PATH
-        if not path.exists():
-            # Fallback auto-detection inside data/master
-            master_dir = settings.DATA_DIR / "master"
-            if master_dir.exists():
-                md_files = list(master_dir.glob("*.md"))
-                if md_files:
-                    path = md_files[0]
-                    
-        if not path.exists():
-            logger.error("Master resume not found at path: %s", path)
+        path = FileLoaderService.resolve_master_resume_path()
+        if path is None or not path.exists():
+            logger.error("Master resume not found at path: %s", settings.MASTER_RESUME_PATH)
             raise HTTPException(
                 status_code=500,
                 detail="Master resume not found. Ensure a markdown (.md) resume exists in data/master/."
