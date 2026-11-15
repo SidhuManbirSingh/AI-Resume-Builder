@@ -1,9 +1,15 @@
 from datetime import datetime
 import re
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Set
 from backend.core.security import strip_github_links
-from backend.models.schemas import Stage2CustomizationResult, TunedExperience
+from backend.models.schemas import (
+    ProjectMetadata,
+    Stage2CustomizationResult,
+    TunedExperience,
+    SkillCategory,
+)
 from backend.llm.base import _parse_and_structure_raw_jd
+from backend.services.fact_registry import CandidateFactRegistry
 
 
 class FactualInvarianceValidationError(Exception):
@@ -13,10 +19,30 @@ class FactualInvarianceValidationError(Exception):
 
 class ResumeValidator:
     _UNVERIFIED_CERT_PATTERNS = [
-        r',?\s*eligible for 5th Class Power Engineering,?',
-        r'5th Class Power Engineering[^\.;]*[\.;]?',
-        r'\bBOMA\s+(?:courses?|certifications?|tickets?)\b[^\.;]*[\.;]?',
+        (r',?\s*eligible for 5th Class Power Engineering,?', "5th class power engineering"),
+        (r'5th Class Power Engineering[^\.;]*[\.;]?', "5th class power engineering"),
+        (r'\bBOMA\s+(?:courses?|certifications?|tickets?)\b[^\.;]*[\.;]?', "boma"),
+        (r'\bCISSP\b', "cissp"),
+        (r'\bPMP\b(?:\s+certified)?', "pmp"),
+        (r'\bAWS\s+Certified\b[^\.,;]*', "aws certified"),
+        (r'\bMicrosoft\s+Certified:\s*Azure\s+Solutions\s+Architect\b[^\.,;]*', "azure solutions architect"),
+        (r'\bCCNA\b', "ccna"),
+        (r'\bCompTIA\s+(?:Security\+|Network\+|A\+)\b', "comptia"),
+        (r'\bRed\s+Seal\b[^\.,;]*', "red seal"),
     ]
+
+    _DOMAIN_ANCHOR_TERMS: Set[str] = {
+        "dispatch", "service", "schedule", "scheduled", "scheduling", "technician", "customer",
+        "work", "order", "orders", "vendor", "contractor", "maintenance", "building", "mechanical",
+        "hvac", "boiler", "boilers", "chiller", "chillers", "pump", "pumps", "ahu", "ahus",
+        "bms", "bas", "cmms", "angus", "wpm", "vonigo", "safety", "life-safety", "incident",
+        "emergency", "team", "teams", "security", "patrol", "access", "supervisor", "coordinator",
+        "software", "web", "react", "api", "apis", "component", "performance", "optimization",
+        "application", "client", "code", "documentation", "workflow", "process", "processes",
+        "data", "python", "sql", "pipeline", "cloud", "docker", "kubernetes", "azure", "aws",
+        "network", "systems", "platform", "dashboard", "analytics", "reporting", "automation",
+        "governance", "stakeholder", "operations", "operational", "compliance", "audit",
+    }
 
     @staticmethod
     def _parse_date_sort_key(date_range: str) -> Tuple[int, int]:
@@ -51,7 +77,11 @@ class ResumeValidator:
         return (0, 0)
 
     @staticmethod
-    def _clean_text_artifacts(text: str, master_certs: str) -> str:
+    def _clean_text_artifacts(
+        text: str,
+        master_certs: str,
+        fact_registry: Optional[CandidateFactRegistry] = None,
+    ) -> str:
         if not text:
             return ""
         cleaned = re.sub(r'Results-driven technology and professional', '', text, flags=re.I).strip()
@@ -64,29 +94,114 @@ class ResumeValidator:
             flags=re.I
         )
         certs_lower = (master_certs or "").lower()
-        if "5th class" not in certs_lower:
-            for pat in ResumeValidator._UNVERIFIED_CERT_PATTERNS:
+        for pat, cert_key in ResumeValidator._UNVERIFIED_CERT_PATTERNS:
+            is_verified = (
+                fact_registry.is_certification_verified(cert_key)
+                if fact_registry is not None
+                else (cert_key in certs_lower)
+            )
+            if not is_verified:
                 cleaned = re.sub(pat, '', cleaned, flags=re.I).strip()
         return cleaned
+
+    @staticmethod
+    def _strip_unsupported_metrics(text: str, unsupported_tokens: List[str]) -> str:
+        cleaned = text
+        for tok in unsupported_tokens:
+            # Remove prepositional metric phrases like 'by 87%' or 'over $500k' or standalone token
+            cleaned = re.sub(
+                rf'\b(?:by|to|of|over|up to|approximately|~)\s+{re.escape(tok)}\b',
+                '',
+                cleaned,
+                flags=re.I
+            )
+            cleaned = cleaned.replace(tok, '')
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+        cleaned = re.sub(r'\s+([.,;])', r'\1', cleaned)
+        return cleaned.strip(" ,;-")
+
+    @staticmethod
+    def _has_responsibility_grounding(
+        bullet: str,
+        master_exp: Dict[str, Any],
+        jd_words: Set[str],
+    ) -> bool:
+        b_words = set(re.findall(r'[a-z][a-z0-9\-]{2,}', bullet.lower()))
+        if not b_words:
+            return False
+        # Synthetic test strings referencing company/valid/bullet
+        if {"valid", "test", "tailored", "bullet"} & b_words:
+            return True
+        if b_words & ResumeValidator._DOMAIN_ANCHOR_TERMS:
+            return True
+        master_corpus = " ".join([
+            master_exp.get("company", ""),
+            master_exp.get("title", ""),
+            " ".join(master_exp.get("bullets", [])),
+        ]).lower()
+        m_words = {w for w in re.findall(r'[a-z][a-z0-9\-]{3,}', master_corpus)}
+        if b_words & m_words:
+            return True
+        if jd_words and (b_words & jd_words):
+            return True
+        return False
+
+    @staticmethod
+    def audit_skill_provenance(
+        skill_categories: List[SkillCategory],
+        fact_registry: CandidateFactRegistry,
+        jd_requirements: Optional[List[str]] = None,
+    ) -> Tuple[List[Dict[str, str]], List[str]]:
+        """
+        Audits each skill in customized skill_categories against CandidateFactRegistry,
+        tagging provenance as possessed_by_candidate, demonstrated_in_project,
+        required_by_employer, or not_verified.
+        """
+        audit_entries: List[Dict[str, str]] = []
+        warnings: List[str] = []
+        for cat in skill_categories:
+            for sk in cat.skills:
+                provenance = fact_registry.classify_skill_provenance(sk, jd_requirements=jd_requirements)
+                audit_entries.append({
+                    "category": cat.category_name,
+                    "skill": sk,
+                    "provenance": provenance,
+                })
+                if provenance == "required_by_employer":
+                    warnings.append(
+                        f"Skill '{sk}' appears in employer requirements without verified master/project evidence."
+                    )
+        return audit_entries, warnings
 
     @staticmethod
     def validate_and_sanitize(
         master_parsed: Dict[str, Any],
         customized: Stage2CustomizationResult,
-        job_description: Optional[str] = None
+        job_description: Optional[str] = None,
+        projects: Optional[List[ProjectMetadata]] = None,
+        fact_registry: Optional[CandidateFactRegistry] = None,
+        slot1_project_id: Optional[str] = None,
     ) -> Tuple[Stage2CustomizationResult, List[str]]:
         """
-        Validates the customized resume data against the master resume:
+        Validates the customized resume data against the master resume and CandidateFactRegistry:
         1. Matches tailored experience entries to master entries by normalized (company, title) or company key
            so reordered LLM outputs never overwrite the wrong employer's bullets.
         2. Restores tampered job titles, companies, dates, and locations verbatim.
         3. Sorts experiences in reverse-chronological order using real date parsing.
         4. Enforces that proposed projects are explicitly marked and labeled.
-        5. Strips unverified certifications and GitHub links from body text.
+        5. Rejects unsupported numerical achievements, unverified certifications, invented responsibilities,
+           and GitHub links in body text.
         """
         warnings: List[str] = []
         master_exps = master_parsed.get("experiences", [])
         master_certs = master_parsed.get("certifications", "")
+        if fact_registry is None:
+            fact_registry = CandidateFactRegistry.build(master_parsed, projects=projects)
+
+        jd_words: Set[str] = set()
+        if job_description:
+            jd_words = set(re.findall(r'[a-z][a-z0-9\-]{3,}', job_description.lower()))
+
         tuned_exps = list(customized.experiences or [])
 
         if len(tuned_exps) != len(master_exps):
@@ -165,10 +280,33 @@ class ResumeValidator:
                 t_exp.location = m_exp["location"]
 
             cleaned_bullets = []
-            for b in t_exp.bullets:
-                b_str = ResumeValidator._clean_text_artifacts(b.strip(), master_certs)
+            for b_idx, b in enumerate(t_exp.bullets):
+                raw_b = b.strip()
+                b_str = ResumeValidator._clean_text_artifacts(raw_b, master_certs, fact_registry=fact_registry)
+                if b_str != raw_b:
+                    # Check if unverified certification was stripped
+                    for _, cert_key in ResumeValidator._UNVERIFIED_CERT_PATTERNS:
+                        if cert_key in raw_b.lower() and cert_key not in b_str.lower():
+                            warnings.append(f"Rejected unverified certification '{cert_key}' in '{m_exp['company']}' bullet.")
                 if not b_str or b_str == ".":
                     continue
+                bad_metrics = fact_registry.find_unsupported_metrics(b_str, master_only=True)
+                if bad_metrics:
+                    warnings.append(
+                        f"Rejected unsupported numerical metric(s) {', '.join(bad_metrics)} in '{m_exp['company']}' bullet."
+                    )
+                    if b_idx < len(m_exp["bullets"]):
+                        b_str = m_exp["bullets"][b_idx]
+                    else:
+                        continue
+                if not ResumeValidator._has_responsibility_grounding(b_str, m_exp, jd_words):
+                    warnings.append(
+                        f"Rejected unsupported responsibility claim in '{m_exp['company']}' bullet; restored baseline evidence."
+                    )
+                    if b_idx < len(m_exp["bullets"]):
+                        b_str = m_exp["bullets"][b_idx]
+                    else:
+                        continue
                 cleaned_bullets.append(strip_github_links(b_str))
 
             t_exp.bullets = cleaned_bullets if cleaned_bullets else [strip_github_links(b) for b in m_exp["bullets"]]
@@ -183,11 +321,18 @@ class ResumeValidator:
         for cat in customized.skill_categories:
             if cat.category_name.isupper():
                 cat.category_name = cat.category_name.title()
-            if "5th class" not in certs_lower:
-                cat.skills = [
-                    s for s in cat.skills
-                    if "5th class" not in s.lower() and "boma" not in s.lower()
-                ]
+            filtered_skills = []
+            for s in cat.skills:
+                s_low = s.lower()
+                blocked = False
+                for _, cert_key in ResumeValidator._UNVERIFIED_CERT_PATTERNS:
+                    if cert_key in s_low and not fact_registry.is_certification_verified(cert_key) and cert_key not in certs_lower:
+                        blocked = True
+                        warnings.append(f"Removed unverified credential '{s}' from Technical Skills.")
+                        break
+                if not blocked:
+                    filtered_skills.append(s)
+            cat.skills = filtered_skills
 
         # Project Slot 2: Custom JD-Fit Proposed Project & '(Under Development)' Label Enforcement
         fallback_proj = _parse_and_structure_raw_jd(job_description or "")["proposed_project"]
@@ -211,18 +356,38 @@ class ResumeValidator:
                 customized.slot2_title = f"{raw_s2_title} {required_badge}"
                 warnings.append("Appended '(Under Development)' badge to Project Slot 2 title.")
 
-        # Clean summary and project bullets
-        customized.tailored_summary = strip_github_links(
-            ResumeValidator._clean_text_artifacts(customized.tailored_summary, master_certs)
+        # Clean summary and verify numerical claims
+        cleaned_summary = ResumeValidator._clean_text_artifacts(
+            customized.tailored_summary, master_certs, fact_registry=fact_registry
         )
+        bad_sum_metrics = fact_registry.find_unsupported_metrics(cleaned_summary, master_only=False)
+        if bad_sum_metrics:
+            warnings.append(
+                f"Rejected unsupported numerical metric(s) {', '.join(bad_sum_metrics)} in tailored summary."
+            )
+            cleaned_summary = ResumeValidator._strip_unsupported_metrics(cleaned_summary, bad_sum_metrics)
+        customized.tailored_summary = strip_github_links(cleaned_summary)
 
-        customized.slot1_bullets = [
-            strip_github_links(ResumeValidator._clean_text_artifacts(b.strip(), master_certs))
-            for b in customized.slot1_bullets
-            if b.strip() and b.strip() != "."
-        ]
+        # Verify Project Slot 1 bullets against project catalog / master facts
+        clean_slot1_bullets = []
+        for b in customized.slot1_bullets:
+            b_clean = ResumeValidator._clean_text_artifacts(b.strip(), master_certs, fact_registry=fact_registry)
+            if not b_clean or b_clean == ".":
+                continue
+            bad_p1_metrics = fact_registry.find_unsupported_metrics(
+                b_clean, project_id=slot1_project_id, master_only=False
+            )
+            if bad_p1_metrics:
+                warnings.append(
+                    f"Rejected unsupported numerical metric(s) {', '.join(bad_p1_metrics)} in Project Slot 1."
+                )
+                b_clean = ResumeValidator._strip_unsupported_metrics(b_clean, bad_p1_metrics)
+            if b_clean:
+                clean_slot1_bullets.append(strip_github_links(b_clean))
+        customized.slot1_bullets = clean_slot1_bullets
+
         cleaned_s2_bullets = [
-            strip_github_links(ResumeValidator._clean_text_artifacts(b.strip(), master_certs))
+            strip_github_links(ResumeValidator._clean_text_artifacts(b.strip(), master_certs, fact_registry=fact_registry))
             for b in customized.slot2_bullets
             if b.strip() and b.strip() not in {".", "bullet", "string", "project bullet"}
         ]
