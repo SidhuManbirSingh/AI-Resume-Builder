@@ -14,6 +14,11 @@ from backend.services.ai_orchestrator import AIResumeOrchestrator
 from backend.services.pdf_generator import ATSResumePDFGenerator
 from backend.services.markdown_assembler import MarkdownAssembler
 from backend.services.llm_client import GeminiLLMClient
+from backend.services.fact_registry import CandidateFactRegistry
+from backend.services.scoring import DeterministicScorer
+from backend.services.qa_validator import FinalDocumentQAValidator
+from backend.llm.prompts import _build_stage2_prompts
+from backend.llm.base import _parse_and_structure_raw_jd
 from backend.models.schemas import (
     Stage1AnalysisResult,
     Stage2CustomizationResult,
@@ -229,11 +234,18 @@ class TestResumeTailoringSystem(unittest.TestCase):
         self.assertIn("utilizing enterprise CMMS workflows equivalent to MRI Angus and WPM Plus", md)
         self.assertNotIn("directly transferable to Angus", md)
 
-        # 5. Reverse-chronological order: Apr 2026 above Feb 2023
-        idx_2026 = md.find("Apr 2026 - Present")
-        idx_2023 = md.find("Feb 2023 - Present")
-        self.assertTrue(idx_2026 != -1 and idx_2023 != -1)
-        self.assertLess(idx_2026, idx_2023)
+        # 5. Reverse-chronological order: most recent experience above earlier (Feb 2023) role
+        _, master_parsed = FileLoaderService.get_master_resume()
+        sorted_exps = sorted(
+            master_parsed["experiences"],
+            key=lambda e: ResumeValidator._parse_date_sort_key(e["date_range"]),
+            reverse=True
+        )
+        self.assertGreaterEqual(len(sorted_exps), 2)
+        idx_first = md.find(sorted_exps[0]["date_range"])
+        idx_second = md.find(sorted_exps[1]["date_range"])
+        self.assertTrue(idx_first != -1 and idx_second != -1)
+        self.assertLess(idx_first, idx_second)
 
         # 6. No leftover AI text
         self.assertNotIn("directly analogous to AI adoption facilitation", md)
@@ -349,19 +361,33 @@ class TestResumeTailoringSystem(unittest.TestCase):
         self.assertIn(f"Unique tailored bullet specifically for {exp_0['company']}", by_company[exp_0["company"]].bullets[0])
         self.assertIn(f"Unique tailored bullet specifically for {exp_1['company']}", by_company[exp_1["company"]].bullets[0])
 
-        # Also verify reverse-chronological sorting places Apr 2026 - Present first
-        self.assertIn("2026", validated.experiences[0].date_range)
+        # Also verify reverse-chronological sorting places newer role first and earlier (2023) role second
+        first_key = ResumeValidator._parse_date_sort_key(validated.experiences[0].date_range)
+        second_key = ResumeValidator._parse_date_sort_key(validated.experiences[1].date_range)
+        self.assertGreater(first_key, second_key)
         self.assertIn("2023", validated.experiences[1].date_range)
 
     def test_parser_preserves_commas_inside_parentheses(self):
         """
-        Regression Test 2: MasterResumeParser.parse keeps 'Work Order Management (MRI Angus, WPM Plus)'
+        Regression Test 2: MasterResumeParser.parse keeps parenthesized lists like
+        'Python (Pandas, NumPy)' and 'Work Order Management (MRI Angus, WPM Plus)'
         intact as a single skill item without splitting on commas inside parentheses.
         """
         _, parsed = FileLoaderService.get_master_resume()
         all_skills = [s for cat in parsed["skills"] for s in cat["skills"]]
-        self.assertIn("Work Order Management (MRI Angus, WPM Plus)", all_skills)
-        self.assertNotIn("WPM Plus)", all_skills)
+        self.assertIn("Python (Pandas, NumPy)", all_skills)
+        self.assertNotIn("NumPy)", all_skills)
+
+        ops_sample = """# Candidate Name
+Surrey, BC | candidate@example.com
+
+## TECHNICAL SKILLS
+- **CMMS & Operations:** Work Order Management (MRI Angus, WPM Plus), Preventative Maintenance
+"""
+        ops_parsed = MasterResumeParser.parse(ops_sample)
+        ops_skills = [s for cat in ops_parsed["skills"] for s in cat["skills"]]
+        self.assertIn("Work Order Management (MRI Angus, WPM Plus)", ops_skills)
+        self.assertNotIn("WPM Plus)", ops_skills)
 
     def test_builtin_sample_jds_end_to_end(self):
         """
@@ -594,6 +620,229 @@ City, BC | email@test.com | [LinkedIn](https://linkedin.com/in/test)
         for b in validated.slot2_bullets:
             self.assertNotEqual(b.strip().lower(), "bullet")
             self.assertTrue(len(b) > 20)
+
+    def test_candidate_fact_registry_and_skill_provenance(self):
+        """Phase 1A: Verify CandidateFactRegistry extracts source-of-truth facts and classifies provenance."""
+        _, master_parsed = FileLoaderService.get_master_resume()
+        projects = FileLoaderService.get_project_catalog()
+        registry = CandidateFactRegistry.build(master_parsed, projects=projects)
+
+        summary = registry.to_summary_dict()
+        self.assertGreaterEqual(summary["counts"]["personal_information"], 3)
+        self.assertGreaterEqual(summary["counts"]["employment_history"], 2)
+        self.assertGreaterEqual(summary["counts"]["education"], 1)
+        self.assertGreaterEqual(summary["counts"]["verified_skills"], 5)
+        self.assertGreaterEqual(summary["counts"]["verified_achievements"], 1)
+        self.assertGreaterEqual(summary["counts"]["project_catalog"], 5)
+
+        self.assertEqual(registry.classify_skill_provenance("Python"), "possessed_by_candidate")
+        self.assertEqual(registry.classify_skill_provenance("YOLOv8"), "demonstrated_in_project")
+        self.assertEqual(
+            registry.classify_skill_provenance("Terraform", jd_requirements=["Terraform"]),
+            "required_by_employer",
+        )
+        self.assertEqual(registry.classify_skill_provenance("COBOL Mainframe"), "not_verified")
+
+    def test_semantic_validator_rejects_fabricated_metrics_and_certs(self):
+        """Phase 1B: Verify ResumeValidator rejects unsupported metrics, certifications, and invented claims."""
+        _, master_parsed = FileLoaderService.get_master_resume()
+        projects = FileLoaderService.get_project_catalog()
+        master_exps = master_parsed["experiences"]
+        self.assertGreaterEqual(len(master_exps), 2)
+
+        fabricated = Stage2CustomizationResult(
+            tailored_summary="Senior Engineer who cut cloud costs by 97.5% and holds CISSP certification.",
+            skill_categories=[
+                SkillCategory(category_name="Security", skills=["Python", "CISSP", "5th Class Power Engineering"])
+            ],
+            experiences=[
+                TunedExperience(
+                    company=master_exps[0]["company"],
+                    title=master_exps[0]["title"],
+                    date_range=master_exps[0]["date_range"],
+                    location=master_exps[0]["location"],
+                    bullets=[
+                        "Built responsive web interfaces that increased revenue by 87% saving $500k in 12x speed.",
+                        "Performed open-heart cardiac surgery on pediatric patients in operating room.",
+                    ],
+                ),
+                TunedExperience(
+                    company=master_exps[1]["company"],
+                    title=master_exps[1]["title"],
+                    date_range=master_exps[1]["date_range"],
+                    location=master_exps[1]["location"],
+                    bullets=["Led teams and earned AWS Certified Solutions Architect badge."],
+                ),
+            ],
+            slot1_title="Self-Hosted GitLab CI/CD Platform on Kubernetes",
+            slot1_bullets=["Configured Kubernetes platform delivering 99.4% cost reduction."],
+            slot2_title="Targeted Prototype Monitor (Under Development)",
+            slot2_bullets=["Developing automated container telemetry and health alerts with Python."],
+            slot2_is_proposed=True,
+        )
+
+        validated, warnings = ResumeValidator.validate_and_sanitize(
+            master_parsed,
+            fabricated,
+            job_description="Cloud & DevOps Engineer with Kubernetes and Python.",
+            projects=projects,
+            slot1_project_id="gitlab_k8s_platform",
+        )
+        joined_bullets = " ".join(b for e in validated.experiences for b in e.bullets)
+        joined_skills = " ".join(s for c in validated.skill_categories for s in c.skills)
+
+        for forbidden in ("87%", "$500k", "12x", "97.5%", "99.4%", "CISSP", "5th Class", "AWS Certified", "cardiac surgery"):
+            self.assertNotIn(forbidden, validated.tailored_summary)
+            self.assertNotIn(forbidden, joined_bullets)
+            self.assertNotIn(forbidden, joined_skills)
+            self.assertNotIn(forbidden, " ".join(validated.slot1_bullets))
+        self.assertTrue(any("unsupported numerical metric" in w.lower() for w in warnings))
+        self.assertTrue(any("unverified" in w.lower() or "responsibility" in w.lower() for w in warnings))
+
+    def test_requirement_matrix_and_deterministic_scoring_formula(self):
+        """Phase 2C & 2D: Verify Requirement Matrix and deterministic 0.40T+0.25R+0.20D+0.15K scoring."""
+        _, master_parsed = FileLoaderService.get_master_resume()
+        projects = FileLoaderService.get_project_catalog()
+        jd = (
+            "Job Title: Cloud Platform & Data Engineer\n"
+            "Requirements: Python, PostgreSQL, Docker, Kubernetes, Power BI, Terraform.\n"
+            "Responsibilities:\n"
+            "- Design and orchestrate containerized CI/CD deployments using Kubernetes and Docker.\n"
+            "- Build automated ETL data pipelines and Power BI analytics dashboards.\n"
+        )
+        structured = _parse_and_structure_raw_jd(jd)
+        registry = CandidateFactRegistry.build(master_parsed, projects=projects)
+        ranked = DeterministicScorer.rank_projects(projects, structured, jd)
+        self.assertEqual(len(ranked), len(projects))
+        for item in ranked:
+            expected = round(
+                0.40 * item.technical_overlap
+                + 0.25 * item.responsibility_alignment
+                + 0.20 * item.domain_relevance
+                + 0.15 * item.keyword_coverage,
+                1,
+            )
+            self.assertAlmostEqual(item.score, expected, places=1)
+            self.assertTrue(0.0 <= item.score <= 100.0)
+
+        matrix = DeterministicScorer.build_requirement_matrix(structured, registry, projects)
+        self.assertGreaterEqual(len(matrix), 3)
+        self.assertTrue(any(m.match_level == "Strong" for m in matrix))
+        self.assertTrue(any(m.provenance == "required_by_employer" for m in matrix))
+
+        res = AIResumeOrchestrator.tailor_resume(jd)
+        self.assertIsNotNone(res.ats_score)
+        ats = res.ats_score
+        expected_ats = round(
+            0.40 * ats.technical_overlap
+            + 0.25 * ats.responsibility_alignment
+            + 0.20 * ats.domain_relevance
+            + 0.15 * ats.keyword_coverage,
+            1,
+        )
+        self.assertAlmostEqual(ats.overall_score, expected_ats, places=1)
+        self.assertEqual(ats.formula, "0.40*T + 0.25*R + 0.20*D + 0.15*K")
+        self.assertGreaterEqual(len(res.requirement_matrix), 3)
+        self.assertIsNotNone(res.telemetry)
+        self.assertEqual(len(res.telemetry.input_hash), 16)
+
+    def test_stage2_prompt_excludes_unselected_projects_and_wraps_untrusted_jd(self):
+        """Phase 3: Verify untrusted input isolation, selected-project-only Stage 2 scope, and Gemini schema retry."""
+        _, master_parsed = FileLoaderService.get_master_resume()
+        projects = FileLoaderService.get_project_catalog()
+        jd = "Senior Kubernetes & DevOps Engineer managing PostgreSQL and CI/CD pipelines."
+        stage1 = Stage1AnalysisResult(
+            target_role_title="Senior Kubernetes & DevOps Engineer",
+            target_company="Example Corp",
+            role_family="software_it",
+            key_technical_requirements=["Kubernetes", "PostgreSQL", "Docker"],
+            key_responsibilities=["Orchestrate CI/CD pipelines"],
+            slot1_project_id="gitlab_k8s_platform",
+            slot1_rationale="Top ranked score.",
+            slot2_is_proposed=True,
+            slot2_rationale="Custom DevOps monitoring fit.",
+            slot2_proposed_title="GitOps Pipeline Monitor (Under Development)",
+            slot2_proposed_technologies=["Kubernetes", "Python"],
+            slot2_proposed_plan="Monitor deployments.",
+        )
+        sys_p, user_p = _build_stage2_prompts(
+            jd, master_parsed, stage1, projects, additional_notes="Emphasize 75 commits on Kubernetes."
+        )
+        self.assertIn("<untrusted_job_description>", user_p)
+        self.assertIn("</untrusted_job_description>", user_p)
+        self.assertIn("<untrusted_user_notes>", user_p)
+        self.assertIn("<requirement_matrix>", user_p)
+        self.assertIn("UNTRUSTED INPUT POLICY", sys_p)
+        self.assertIn("Self-Hosted GitLab CI/CD Platform", user_p)
+        # Unselected catalog project markdown details must not be dumped into Stage 2 prompt
+        self.assertNotIn("0.8489 overall mAP@50", user_p)
+
+        # Bounded schema retry test on GeminiLLMClient
+        bad_resp = MagicMock()
+        bad_resp.status_code = 200
+        bad_resp.json.return_value = {"candidates": [{"content": {"parts": [{"text": "NOT VALID JSON"}]}}]}
+
+        valid_stage1_payload = {
+            "target_role_title": "DevOps Engineer",
+            "target_company": "Example Corp",
+            "role_family": "software_it",
+            "key_technical_requirements": ["Kubernetes"],
+            "key_responsibilities": ["Manage clusters"],
+            "slot1_project_id": "gitlab_k8s_platform",
+            "slot1_rationale": "Strong fit.",
+            "slot2_is_proposed": True,
+            "slot2_project_id": None,
+            "slot2_rationale": "Custom fit.",
+            "slot2_proposed_title": "Cluster Monitor (Under Development)",
+            "slot2_proposed_technologies": ["Kubernetes"],
+            "slot2_proposed_plan": "Build monitor.",
+        }
+        good_resp = MagicMock()
+        good_resp.status_code = 200
+        good_resp.json.return_value = {"candidates": [{"content": {"parts": [{"text": json.dumps(valid_stage1_payload)}]}}]}
+
+        client = GeminiLLMClient(api_key="AIzaTestRetryKey", model="gemini-2.5-flash")
+        with patch("backend.llm.gemini.requests.post", side_effect=[bad_resp, good_resp]) as mock_post:
+            res = client.analyze_and_select(jd, master_parsed, projects)
+            self.assertEqual(mock_post.call_count, 2)
+            self.assertEqual(res.slot1_project_id, "gitlab_k8s_platform")
+
+    def test_final_qa_validator_inspects_markdown_and_pdf_bytes(self):
+        """Phase 4E: Verify FinalDocumentQAValidator checks both Markdown and compiled PDF bytes across all 9 checks."""
+        _, master_parsed = FileLoaderService.get_master_resume()
+        jd = (
+            "Senior Cloud & Distributed Systems Engineer. Build Python, SQL, Docker, Kubernetes, "
+            "AWS, CI/CD pipelines, and Power BI analytics dashboards."
+        )
+        res = AIResumeOrchestrator.tailor_resume(jd)
+        self.assertIsNotNone(res.qa_report)
+        self.assertEqual(len(res.qa_report.checks), 9)
+        self.assertTrue(res.qa_report.passed, msg=f"Unexpected QA failure: {res.qa_report.warnings}")
+
+        # Negative case: duplicate section + broken URL + HTML tag + triple blank line + keyword stuffing
+        bad_md = res.tailored_markdown + (
+            "\n\n\n## Professional Summary\nDuplicate <u>section</u> with [Broken](not-a-valid-url)\n"
+            + ("kubernetes " * 15)
+        )
+        pdf_bytes = ATSResumePDFGenerator.markdown_to_pdf_bytes(res.tailored_markdown)
+        dummy_custom = Stage2CustomizationResult(
+            tailored_summary="Summary",
+            skill_categories=[],
+            experiences=[],
+            slot1_title="GitLab K8s",
+            slot1_bullets=["Bullet 1", "Bullet 2"],
+            slot2_title="Prototype (Under Development)",
+            slot2_bullets=["Bullet 1", "Bullet 2"],
+            slot2_is_proposed=True,
+        )
+        bad_report = FinalDocumentQAValidator.validate(bad_md, pdf_bytes, master_parsed, dummy_custom)
+        self.assertFalse(bad_report.passed)
+        by_name = {c.name: c for c in bad_report.checks}
+        self.assertFalse(by_name["ats_formatting"].passed)
+        self.assertFalse(by_name["section_completeness"].passed)
+        self.assertFalse(by_name["github_and_urls"].passed)
+        self.assertFalse(by_name["spacing_and_page_breaks"].passed)
+        self.assertFalse(by_name["keyword_repetition"].passed)
 
 if __name__ == "__main__":
     unittest.main()
